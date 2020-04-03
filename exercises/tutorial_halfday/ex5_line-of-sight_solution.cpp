@@ -63,6 +63,10 @@
 #if defined(RAJA_ENABLE_CUDA)
 const int CUDA_BLOCK_SIZE = 256;
 #endif
+#if defined(RAJA_ENABLE_SYCL)
+const int SYCL_BLOCK_SIZE = 256;
+#endif
+
 
 //
 // Functions to check results and print arrays.
@@ -221,6 +225,69 @@ int main(int RAJA_UNUSED_ARG(argc), char** RAJA_UNUSED_ARG(argv[]))
        visible[i] = 0;
     }
   });
+
+  num_visible = checkResult(visible, visible_ref, N);
+  std::cout << "\n\t num visible points = " << num_visible << "\n\n";
+//printArray(visible, N);
+
+#endif
+
+//----------------------------------------------------------------------------//
+// RAJA SYCL variant
+//----------------------------------------------------------------------------//
+
+#if defined(RAJA_ENABLE_SYCL)
+
+  std::cout << "\n\n Running RAJA SYCL line-of-sight algorithm...\n";
+
+  std::memset(ang_max, 0, N * sizeof(double));
+  std::memset(visible, 0, N * sizeof(int));
+  num_visible = 0;
+
+  ang_max[0] = ang[0];
+  for (int i = 1; i < N; ++i) {
+      ang_max[i] = std::max(ang[i], ang_max[i-1]);
+  }
+
+  cl::sycl::queue q(::sycl::default_selector{});
+  double* ang_d = (double*) cl::sycl::malloc_device(N * sizeof(double), q);
+  double* ang_max_d = (double*) cl::sycl::malloc_device(N * sizeof(double), q);
+  int* visible_d = (int*) cl::sycl::malloc_device(N * sizeof(int), q);
+
+  auto e1 = q.memcpy(ang_d, ang, N * sizeof(double));
+  auto e2 = q.memcpy(ang_max_d, ang_max, N * sizeof(double));
+  auto e4 = q.memset(visible_d, 0, N * sizeof(int));
+  e1.wait();
+  e2.wait();
+
+  using EXEC_POL4 = RAJA::KernelPolicy<
+                      RAJA::statement::SyclKernel<
+                        RAJA::statement::For<0, RAJA::sycl_exec<SYCL_BLOCK_SIZE>,
+                          RAJA::statement::Lambda<0>
+                        >
+                      >
+                    >;
+
+//  RAJA::inclusive_scan< EXEC_POL4 >(ang, ang+N, ang_max,
+   //                                 RAJA::operators::maximum<double>{} );
+
+  RAJA::kernel< EXEC_POL4 >(RAJA::make_tuple(RAJA::RangeSegment(0, N)), [=] RAJA_DEVICE (int i) {
+    if ( ang_d[i] >= ang_max_d[i] ) {
+       visible_d[i] = 1;
+    } else {
+       visible_d[i] = 0;
+    }
+  });
+
+  auto e3 = q.memcpy(visible, visible_d, N * sizeof(int));
+  e3.wait();
+  cl::sycl::free(ang_d, q);
+  cl::sycl::free(ang_max_d, q);
+  cl::sycl::free(visible_d, q);
+
+//  for (int i = 0; i < N; i++) {
+  //  std::cout << "visible[" << i << "] = " << visible[i] << std::endl;
+//  }
 
   num_visible = checkResult(visible, visible_ref, N);
   std::cout << "\n\t num visible points = " << num_visible << "\n\n";
