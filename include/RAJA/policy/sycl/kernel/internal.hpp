@@ -58,20 +58,20 @@ namespace internal
 // LaunchDims and Helper functions
 struct LaunchDims {
   sycl_dim_t blocks;
-  sycl_dim_t min_blocks;
+//  sycl_dim_t min_blocks;
   sycl_dim_t threads;
-  sycl_dim_t min_threads;
+//  sycl_dim_t min_threads;
 
   RAJA_INLINE
   RAJA_HOST_DEVICE
-  LaunchDims() : blocks{0},  min_blocks{0},
-                 threads{0}, min_threads{0} {}
+  LaunchDims() : blocks{1,1,1}, // min_blocks{0},
+                 threads{1,1,1} {}//, min_threads{0} {}
 
   RAJA_INLINE
   RAJA_HOST_DEVICE
   LaunchDims(LaunchDims const &c) :
-  blocks(c.blocks),   min_blocks(c.min_blocks),
-  threads(c.threads), min_threads(c.min_threads)
+  blocks(c.blocks),//   min_blocks(c.min_blocks),
+  threads(c.threads)//, min_threads(c.min_threads)
   {
   }
 
@@ -80,14 +80,22 @@ struct LaunchDims {
   {
     LaunchDims result;
 
-    result.blocks = cl::sycl::range<1> {std::max(c.blocks.get(0), blocks.get(0))};
+    result.blocks.x = std::max(c.blocks.x, blocks.x);
+    result.blocks.y = std::max(c.blocks.y, blocks.y);
+    result.blocks.z = std::max(c.blocks.z, blocks.z);
+
+    result.threads.x = std::max(c.threads.x, threads.x);
+    result.threads.y = std::max(c.threads.y, threads.y);
+    result.threads.z = std::max(c.threads.z, threads.z);
+
+/*    result.blocks = cl::sycl::range<1> {std::max(c.blocks.get(0), blocks.get(0))};
 
     result.min_blocks = cl::sycl::range<1> {std::max(c.min_blocks.get(0), min_blocks.get(0))};
 
     result.threads = cl::sycl::range<1> {std::max(c.threads.get(0), threads.get(0))};
 
     result.min_threads = cl::sycl::range<1> {std::max(c.min_threads.get(0), min_threads.get(0))};
-
+*/
     return result;
   }
 };
@@ -101,7 +109,7 @@ struct SyclStatementListExecutorHelper {
   using cur_stmt_t = camp::at_v<StmtList, cur_stmt>;
 
   template <typename Data>
-  inline static RAJA_DEVICE void exec(Data &data, cl::sycl::nd_item<1> item)
+  inline static RAJA_DEVICE void exec(Data &data, cl::sycl::nd_item<3> item)
   {
     // Execute stmt
     cur_stmt_t::exec(data, item);
@@ -129,7 +137,7 @@ template <camp::idx_t num_stmts, typename StmtList>
 struct SyclStatementListExecutorHelper<num_stmts, num_stmts, StmtList> {
 
   template <typename Data>
-  inline static RAJA_DEVICE void exec(Data &, cl::sycl::nd_item<1>)
+  inline static RAJA_DEVICE void exec(Data &, cl::sycl::nd_item<3>)
   {
     // nop terminator
   }
@@ -159,7 +167,7 @@ struct SyclStatementListExecutor<Data, StatementList<Stmts...>, Types> {
   static
   inline
   RAJA_DEVICE
-  void exec(Data &data, cl::sycl::nd_item<1> item)
+  void exec(Data &data, cl::sycl::nd_item<3> item)
   {
 //    std::cout << "in SyclStatementListExecutor.exec, should call helper" << std::endl;
     // Execute statements in order with helper class

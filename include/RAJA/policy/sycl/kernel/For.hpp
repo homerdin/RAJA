@@ -29,33 +29,82 @@ namespace RAJA
 namespace internal
 {
 
-template <typename Data, typename Types, typename... EnclosedStmts>
-struct SyclForWrapper : public GenericWrapperBase
-{
-  using data_t = camp::decay<Data>;
+// SyclStatementExecutors
+//
 
-  data_t data;
+/*
+ * Executor for block work sharing inside SyclKernel.
+ * Mapping directly to indicies
+ * Assigns the loop index to offset ArgumentId
+ */
+template <typename Data,
+          camp::idx_t ArgumentId,
+          int BlockDim,
+          typename... EnclosedStmts,
+          typename Types>
+struct SyclStatementExecutor<
+    Data,
+    statement::For<ArgumentId, RAJA::sycl_work_item_123_direct<BlockDim>, EnclosedStmts...>,
+    Types> {
 
-  /*! 
- *    * \brief Deferences data so that it can be mapped to the device
- *       */
-  RAJA_INLINE
-  constexpr explicit SyclForWrapper(data_t &d) :
-    data{d}  {}
+  using stmt_list_t = StatementList<EnclosedStmts...>;
 
-  RAJA_INLINE
-  void exec() { execute_statement_list<camp::list<EnclosedStmts...>, Types>(data); }
+  // Set the argument type for this loop
+  using NewTypes = setSegmentTypeFromData<Types, ArgumentId, Data>;
 
-  template <typename InIndexType>
-  RAJA_INLINE void operator()(InIndexType i)
+  using enclosed_stmts_t =
+      SyclStatementListExecutor<Data, stmt_list_t, NewTypes>;
+
+
+  static
+  inline RAJA_DEVICE void exec(Data &data, cl::sycl::nd_item<3> item)
   {
-//    data.template assign_offset<ArgumentId>(i);
-    exec();
+    auto len = segment_length<ArgumentId>(data);
+    auto i = item.get_global_id(BlockDim);
+
+    if (i < len) {
+
+      // Assign the x thread to the argument
+      data.template assign_offset<ArgumentId>(i);
+
+      // execute enclosed statements
+      enclosed_stmts_t::exec(data, item);
+    }
+  }
+
+
+  static
+  inline
+  LaunchDims calculateDimensions(Data const &data)
+  {
+    auto len = segment_length<ArgumentId>(data);
+
+    // request one block per element in the segment
+    LaunchDims dims;
+    if (BlockDim == 0) {
+      dims.threads.x = 1;
+      dims.blocks.x = len;
+    } 
+    if (BlockDim == 1) {
+      dims.threads.y = 1;
+      dims.blocks.y = len;
+    }
+    if (BlockDim == 2) {
+      dims.threads.z = 1;
+      dims.blocks.z = len;
+    }
+//    dims.blocks = 256 * ((len + 256 -1) / 256);
+//    set_sycl_dim<BlockDim>(len);
+
+    // since we are direct-mapping, we REQUIRE len
+//    set_sycl_dim<BlockDim>(dims.min_blocks, len);
+
+    // combine with enclosed statements
+    LaunchDims enclosed_dims = enclosed_stmts_t::calculateDimensions(data);
+    return dims.max(enclosed_dims);
   }
 };
 
-// SyclStatementExecutors
-//
 /*
  * Executor for block work sharing inside SyclKernel.
  * Mapping directly to indicies
@@ -81,7 +130,7 @@ struct SyclStatementExecutor<
 
 
   static
-  inline RAJA_DEVICE void exec(Data &data, cl::sycl::nd_item<1> item)
+  inline RAJA_DEVICE void exec(Data &data, cl::sycl::nd_item<3> item)
   {
     auto len = segment_length<ArgumentId>(data);
     auto i = item.get_global_id(0);
@@ -105,12 +154,12 @@ struct SyclStatementExecutor<
 
     // request one block per element in the segment
     LaunchDims dims;
-    dims.threads = len;
-    dims.blocks = 256 * ((len + 256 -1) / 256);
+    dims.threads.x = 1;
+    dims.blocks.x = len;// 256 * ((len + 256 -1) / 256);
 //    set_sycl_dim<BlockDim>(dims.blocks, len);
 
     // since we are direct-mapping, we REQUIRE len
-//    set_sycl_dim<BlockDim>(dims.min_blocks, len);
+  //  set_sycl_dim<BlockDim>(dims.min_blocks, len);
 
     // combine with enclosed statements
     LaunchDims enclosed_dims = enclosed_stmts_t::calculateDimensions(data);

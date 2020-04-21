@@ -141,6 +141,61 @@ int main(int RAJA_UNUSED_ARG(argc), char **RAJA_UNUSED_ARG(argv[]))
 
 #endif
 
+#if defined(RAJA_ENABLE_SYCL)
+  int N = 8;
+
+  struct Point {
+    int i, j, k;
+  };
+
+  Point A[N];
+
+  cl::sycl::queue q(::sycl::default_selector{});
+  Point* points_d = (Point*) cl::sycl::malloc_device(N * sizeof(Point), q);
+  q.memset(points_d, 0, N * sizeof(Point));
+  q.wait();
+ 
+  RAJA::TypedRangeSegment<int> dKRange(2, 4);
+  RAJA::TypedRangeSegment<int> dJRange(1, 3);
+  RAJA::TypedRangeSegment<int> dIRange(0, 2);
+
+
+  using IJK_EXEC_POL = RAJA::KernelPolicy<
+                         RAJA::statement::SyclKernel<
+                           RAJA::statement::For<0, RAJA::sycl_work_item_1_direct,
+                             RAJA::statement::For<1, RAJA::sycl_work_item_2_direct,
+                               RAJA::statement::For<2, RAJA::sycl_work_item_3_direct,
+                                 RAJA::statement::Lambda<0>
+                               >
+                             >
+                           >
+                         >
+                       >;
+
+  RAJA::kernel<IJK_EXEC_POL>( RAJA::make_tuple(dIRange, dJRange, dKRange),
+  [=] (int i, int j, int k) {
+     int glob_i = i == 0 ? 0 : 4;
+     int glob_j = j == 1 ? 0 : 2;
+     int glob_k = k == 2 ? 0 : 1;
+     int glob = glob_i + glob_j + glob_k;
+     points_d[glob].i = i;
+     points_d[glob].j = j;
+     points_d[glob].k = k;
+//     printf( " (%d, %d, %d) \n", (int)(*i), (int)(*j), (int)(*k));
+      
+  });
+
+  auto e3 = q.memcpy(A, points_d, N * sizeof(Point));
+  e3.wait();
+  cl::sycl::free(points_d, q);
+
+  for (int i=0; i < N ; i++)
+    std::cout << "\nPoint[" << i << "] = (" << A[i].i << ", " << A[i].j << ", " << A[i].k << ")" << std::endl;
+
+
+#endif
+
+
   std::cout << "\n DONE!...\n";
 
   return 0;

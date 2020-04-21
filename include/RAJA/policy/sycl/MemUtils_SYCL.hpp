@@ -88,9 +88,9 @@ RAJA_INLINE
 void launch(const void* &func, sycl_dim_t gridDim, sycl_dim_t blockDim, void** args, size_t shmem, cl::sycl::queue stream)
 {
 
-  std::cout << "GridDims:\n\tGridDim0: " << gridDim.get(0) << std::endl;
-  std::cout << "GridDims:\n\tBlockDim0: " << blockDim.get(0) <<  std::endl;
-  auto global_size = blockDim.get(0);
+//  std::cout << "GridDims:\n\tGridDim0: " << gridDim.x << std::endl;
+//  std::cout << "GridDims:\n\tBlockDim0: " << blockDim.x <<  std::endl;
+  auto global_size = blockDim.x;
   std::cout << "Ready to Launch" << std::endl;
 
   cl::sycl::queue q;

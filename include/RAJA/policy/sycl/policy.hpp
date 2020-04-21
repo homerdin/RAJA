@@ -25,7 +25,12 @@
 namespace RAJA
 {
 
-using sycl_dim_t = cl::sycl::range<1>;
+struct uint3 {
+  unsigned int x, y, z;
+};
+//using sycl_dim_t = cl::sycl::range<1>;
+
+using sycl_dim_t = uint3;
 
 namespace detail
 {
@@ -113,15 +118,21 @@ using policy::sycl::sycl_exec;
 //using policy::sycl::sycl_reduce;
 //using policy::sycl::sycl_segit;
 
-namespace internal{
+/*!
+ * Maps segment indices to SYCL threads.
+ * This is the lowest overhead mapping, but requires that there are enough
+ * physical threads to fit all of the direct map requests.
+ * For example, a segment of size 2000 will not fit, and trigger a runtime
+ * error.
+ */
+template<int dim>
+struct sycl_work_item_123_direct{};
 
-template<int dim, typename dim_t>
-constexpr
-auto get_sycl_dim(dim_t const &d) ->
-  decltype(d.get(0))
-{
-  return d.get(0); //CudaDimHelper<dim>::get(d);
-}
+using sycl_work_item_1_direct = sycl_work_item_123_direct<0>;
+using sycl_work_item_2_direct = sycl_work_item_123_direct<1>;
+using sycl_work_item_3_direct = sycl_work_item_123_direct<2>;
+
+namespace internal{
 
 } // namespace internal
 

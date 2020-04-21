@@ -59,10 +59,10 @@ namespace impl
  ******************************************************************************
  */
 RAJA_INLINE
-sycl_dim_t getGridDim(size_t len, sycl_dim_t block_size)
+cl::sycl::range<1> getGridDim(size_t len, size_t block_size)
 {
-  sycl_dim_t gridSize{block_size * ((len + block_size - 1) / block_size)};
-
+  size_t size = {block_size * ((len + block_size - 1) / block_size)};
+  cl::sycl::range<1> gridSize(size);
   return gridSize;
 }
 
@@ -92,7 +92,7 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
   //
   Iterator begin = std::begin(iter);
   Iterator end = std::end(iter);
-  IndexType len = std::distance(begin, end);
+  size_t len = std::distance(begin, end);
   IndexType offset = *begin;
 
   std::cout << "Begin: " << *begin << "\nEnd: " << *end << std::endl;
@@ -103,8 +103,8 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
     //
     // Compute the number of blocks
     //
-  sycl_dim_t blockSize{BlockSize};
-  sycl_dim_t gridSize = impl::getGridDim(static_cast<size_t>(len), BlockSize);
+  cl::sycl::range<1> blockSize{BlockSize};
+  cl::sycl::range<1> gridSize = impl::getGridDim(static_cast<size_t>(len), BlockSize);
 
   cl::sycl::queue q(cl::sycl::default_selector{});
 

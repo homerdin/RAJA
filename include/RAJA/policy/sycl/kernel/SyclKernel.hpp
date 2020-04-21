@@ -112,7 +112,7 @@ namespace internal
  */
 template <size_t BlockSize, typename Data, typename Exec>
 //__launch_bounds__(BlockSize, 1) __global__
-    void SyclKernelLauncherFixed(Data data, cl::sycl::nd_item<1> item)
+    void SyclKernelLauncherFixed(Data data, cl::sycl::nd_item<3> item)
 {
 
   using data_t = camp::decay<Data>;
@@ -179,15 +179,32 @@ struct SyclLaunchHelper<sycl_launch<async0, num_blocks, num_threads>,StmtList,Da
     auto e = stream.memcpy(d_data, &data, sizeof(data_t));
     e.wait();
 
+    std::cout << "Blocks.x = " << launch_dims.blocks.x
+              << "\nBlocks.y = " << launch_dims.blocks.y
+              << "\nBlocks.z = " << launch_dims.blocks.z
+              << "\nThreads.x = " << launch_dims.threads.x
+              << "\nThreads.y = " << launch_dims.threads.y
+              << "\nThreads.z = " << launch_dims.threads.z;
+
+
+    cl::sycl::nd_range<3> range = {{launch_dims.blocks.x, launch_dims.blocks.y, launch_dims.blocks.z},
+                                  {launch_dims.threads.x, launch_dims.threads.y, launch_dims.threads.z}};
+
     stream.submit([&](cl::sycl::handler& h) {
  
-      h.parallel_for( cl::sycl::nd_range<1>{launch_dims.threads, 1},
-                      [=] (cl::sycl::nd_item<1> item) {
+      h.parallel_for( range,
+                      [=] (cl::sycl::nd_item<3> item) {
 
 //      size_t ii = item.get_global_id(0);
        SyclKernelLauncherFixed<256, Data, executor_t>(*d_data,item);
       });
     });
+
+    stream.wait();
+//    if (!async) { stream.wait(); };
+
+    cl::sycl::free(d_data, stream);
+    
 
 //    RAJA::sycl::launch(func, launch_dims.blocks, launch_dims.threads, args, shmem, stream);
   }
