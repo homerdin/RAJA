@@ -167,6 +167,58 @@ struct SyclStatementExecutor<
   }
 };
 
+/*
+ * Executor for sequential loops inside of a SyclKernel.
+ *
+ * This is specialized since it need to execute the loop immediately.
+ * Assigns the loop index to offset ArgumentId
+ */
+template <typename Data,
+          camp::idx_t ArgumentId,
+          typename... EnclosedStmts,
+          typename Types>
+struct SyclStatementExecutor<
+    Data,
+    statement::For<ArgumentId, seq_exec, EnclosedStmts...>,
+    Types> {
+
+  using stmt_list_t = StatementList<EnclosedStmts...>;
+
+  // Set the argument type for this loop
+  using NewTypes = setSegmentTypeFromData<Types, ArgumentId, Data>;
+
+  using enclosed_stmts_t =
+      SyclStatementListExecutor<Data, stmt_list_t, NewTypes>;
+
+  static
+  inline
+  RAJA_DEVICE
+  void exec(Data &data, cl::sycl::nd_item<3> item)
+  {
+
+    using idx_type = camp::decay<decltype(camp::get<ArgumentId>(data.offset_tuple))>;
+
+    idx_type len = segment_length<ArgumentId>(data);
+
+    for(idx_type i = 0;i < len;++ i){
+      // Assign i to the argument
+      data.template assign_offset<ArgumentId>(i);
+
+      // execute enclosed statements
+      enclosed_stmts_t::exec(data, item);
+    }
+  }
+
+
+  static
+  inline
+  LaunchDims calculateDimensions(Data const &data)
+  {
+    return enclosed_stmts_t::calculateDimensions(data);
+  }
+};
+
+
 }  // namespace internal
 }  // end namespace RAJA
 
