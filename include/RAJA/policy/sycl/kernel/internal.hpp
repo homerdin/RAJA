@@ -107,9 +107,9 @@ struct SyclStatementListExecutorHelper {
       SyclStatementListExecutorHelper<cur_stmt + 1, num_stmts, StmtList>;
 
   using cur_stmt_t = camp::at_v<StmtList, cur_stmt>;
-
+/*
   template <typename Data>
-  inline static RAJA_DEVICE void exec(Data &data, cl::sycl::nd_item<3> item)
+  inline static RAJA_DEVICE void exec(Data &data, cl::sycl::h_item<3> item)
   {
     // Execute stmt
     cur_stmt_t::exec(data, item);
@@ -117,7 +117,16 @@ struct SyclStatementListExecutorHelper {
     // Execute next stmt
     next_helper_t::exec(data, item);
   }
+*/
+  template <typename Data>
+  inline static RAJA_DEVICE void exec(Data &data, cl::sycl::group<3> group, cl::sycl::h_item<3> item)
+  {
+    // Execute stmt
+    cur_stmt_t::exec(data, group, item);
 
+    // Execute next stmt
+    next_helper_t::exec(data, group, item);
+  }
 
   template <typename Data>
   inline static LaunchDims calculateDimensions(Data &data)
@@ -137,11 +146,17 @@ template <camp::idx_t num_stmts, typename StmtList>
 struct SyclStatementListExecutorHelper<num_stmts, num_stmts, StmtList> {
 
   template <typename Data>
-  inline static RAJA_DEVICE void exec(Data &, cl::sycl::nd_item<3>)
+  inline static RAJA_DEVICE void exec(Data &, cl::sycl::group<3>, cl::sycl::h_item<3> item)
   {
     // nop terminator
   }
-
+/*
+  template <typename Data>
+  inline static RAJA_DEVICE void exec(Data &, cl::sycl::h_item<3>)
+  {
+    // nop terminator
+  }
+*/
   template <typename Data>
   inline static LaunchDims calculateDimensions(Data &)
   {
@@ -167,15 +182,23 @@ struct SyclStatementListExecutor<Data, StatementList<Stmts...>, Types> {
   static
   inline
   RAJA_DEVICE
-  void exec(Data &data, cl::sycl::nd_item<3> item)
+  void exec(Data &data, cl::sycl::group<3> group, cl::sycl::h_item<3> item)
+  {
+//    std::cout << "in SyclStatementListExecutor.exec, should call helper" << std::endl;
+    // Execute statements in order with helper class
+    SyclStatementListExecutorHelper<0, num_stmts, enclosed_stmts_t>::exec(data, group, item);
+  }
+/*
+  static
+  inline
+  RAJA_DEVICE
+  void exec(Data &data, cl::sycl::h_item<3> item)
   {
 //    std::cout << "in SyclStatementListExecutor.exec, should call helper" << std::endl;
     // Execute statements in order with helper class
     SyclStatementListExecutorHelper<0, num_stmts, enclosed_stmts_t>::exec(data, item);
   }
-
-
-
+*/
   static
   inline
   LaunchDims calculateDimensions(Data const &data)

@@ -46,7 +46,7 @@ template <typename Data, camp::idx_t LambdaIndex, typename... Args, typename Typ
 struct SyclStatementExecutor<Data, statement::Lambda<LambdaIndex, Args...>, Types> {
 
   static
-  inline RAJA_DEVICE void exec(Data &data, cl::sycl::nd_item<3> item)
+  inline RAJA_DEVICE void exec(Data &data, cl::sycl::group<3> group, cl::sycl::h_item<3> item)
   {
     // Only execute the lambda if it hasn't been masked off
 //    if(thread_active){
@@ -54,8 +54,18 @@ struct SyclStatementExecutor<Data, statement::Lambda<LambdaIndex, Args...>, Type
 //    }
 
   }
+/*
+  static
+  inline RAJA_DEVICE void exec(Data &data, cl::sycl::h_item<3> item)
+  {
 
+    // Only execute the lambda if it hasn't been masked off
+//    if(thread_active) {
+      StatementExecutor<statement::Lambda<LambdaIndex, Args...>, Types>::exec(data);
+//    }
 
+  }
+*/
   static
   inline
   LaunchDims calculateDimensions(Data const & RAJA_UNUSED_ARG(data))
@@ -63,6 +73,7 @@ struct SyclStatementExecutor<Data, statement::Lambda<LambdaIndex, Args...>, Type
     return LaunchDims();
   }
 };
+
 
 //
 /*

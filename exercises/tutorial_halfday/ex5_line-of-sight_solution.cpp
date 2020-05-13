@@ -241,7 +241,7 @@ int main(int RAJA_UNUSED_ARG(argc), char** RAJA_UNUSED_ARG(argv[]))
   std::cout << "\n\n Running RAJA SYCL line-of-sight algorithm...\n";
 
   std::memset(ang_max, 0, N * sizeof(double));
-  std::memset(visible, 0, N * sizeof(int));
+  std::memset(visible, 4, N * sizeof(int));
   num_visible = 0;
 
   ang_max[0] = ang[0];
@@ -256,13 +256,13 @@ int main(int RAJA_UNUSED_ARG(argc), char** RAJA_UNUSED_ARG(argv[]))
 
   auto e1 = q.memcpy(ang_d, ang, N * sizeof(double));
   auto e2 = q.memcpy(ang_max_d, ang_max, N * sizeof(double));
-  auto e4 = q.memset(visible_d, 0, N * sizeof(int));
+  auto e4 = q.memset(visible_d, 5, N * sizeof(int));
   e1.wait();
   e2.wait();
 
   using EXEC_POL4 = RAJA::KernelPolicy<
                       RAJA::statement::SyclKernel<
-                        RAJA::statement::For<0, RAJA::sycl_exec<SYCL_BLOCK_SIZE>,
+                        RAJA::statement::For<0, RAJA::sycl_item_2, //RAJA::sycl_exec<SYCL_BLOCK_SIZE>,
                           RAJA::statement::Lambda<0>
                         >
                       >
@@ -286,7 +286,7 @@ int main(int RAJA_UNUSED_ARG(argc), char** RAJA_UNUSED_ARG(argv[]))
   cl::sycl::free(visible_d, q);
 
 //  for (int i = 0; i < N; i++) {
-  //  std::cout << "visible[" << i << "] = " << visible[i] << std::endl;
+//    std::cout << "visible[" << i << "] = " << visible[i] << std::endl;
 //  }
 
   num_visible = checkResult(visible, visible_ref, N);

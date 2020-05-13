@@ -126,12 +126,30 @@ using policy::sycl::sycl_exec;
  * error.
  */
 template<int dim>
-struct sycl_work_item_123_direct{};
+struct sycl_group_123{};
 
-using sycl_work_item_1_direct = sycl_work_item_123_direct<0>;
-using sycl_work_item_2_direct = sycl_work_item_123_direct<1>;
-using sycl_work_item_3_direct = sycl_work_item_123_direct<2>;
+using sycl_group_1 = sycl_group_123<0>;
+using sycl_group_2 = sycl_group_123<1>;
+using sycl_group_3 = sycl_group_123<2>;
 
+/*!
+ * Maps segment indices to SYCL threads.
+ * This is the lowest overhead mapping, but requires that there are enough
+ * physical threads to fit all of the direct map requests.
+ * For example, a segment of size 2000 will not fit, and trigger a runtime
+ * error.
+ */
+template<int dim>
+struct sycl_item_123{};
+
+using sycl_item_1 = sycl_item_123<0>;
+using sycl_item_2 = sycl_item_123<1>;
+using sycl_item_3 = sycl_item_123<2>;
+
+/*using sycl_exec_1 = sycl_exec_1<1>;
+using sycl_exec_2 = sycl_exec_2<1>;
+using sycl_exec_3 = sycl_exec_3<1>;
+*/
 namespace internal{
 
 } // namespace internal

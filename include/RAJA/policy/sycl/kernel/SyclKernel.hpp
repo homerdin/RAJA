@@ -111,15 +111,14 @@ namespace internal
  * This launcher is used by the SyclKerelFixed policies.
  */
 template <size_t BlockSize, typename Data, typename Exec>
-//__launch_bounds__(BlockSize, 1) __global__
-    void SyclKernelLauncherFixed(Data data, cl::sycl::nd_item<3> item)
+void SyclKernelLauncherFixed(Data data, cl::sycl::group<3> group, cl::sycl::h_item<3> item)
 {
 
   using data_t = camp::decay<Data>;
   data_t private_data = data;
 
   // execute the the object
-  Exec::exec(private_data, item);
+  Exec::exec(private_data, group, item);
 }
 
 /*!
@@ -187,16 +186,23 @@ struct SyclLaunchHelper<sycl_launch<async0, num_blocks, num_threads>,StmtList,Da
               << "\nThreads.z = " << launch_dims.threads.z;
 
 
-    cl::sycl::nd_range<3> range = {{launch_dims.blocks.x, launch_dims.blocks.y, launch_dims.blocks.z},
-                                  {launch_dims.threads.x, launch_dims.threads.y, launch_dims.threads.z}};
+    cl::sycl::range<3> group_range {launch_dims.blocks.x, launch_dims.blocks.y, launch_dims.blocks.z};
+    cl::sycl::range<3> item_range {launch_dims.threads.x, launch_dims.threads.y, launch_dims.threads.z};
+
 
     stream.submit([&](cl::sycl::handler& h) {
- 
-      h.parallel_for( range,
-                      [=] (cl::sycl::nd_item<3> item) {
 
+//      cl::sycl::stream out(1024, 256, h);
+ 
+      h.parallel_for_work_group(group_range, item_range,
+                                [=] (cl::sycl::group<3> group) {
+
+        group.parallel_for_work_item([&] (cl::sycl::h_item<3> item) {
+        
+//       out << "Hello\n";
 //      size_t ii = item.get_global_id(0);
-       SyclKernelLauncherFixed<256, Data, executor_t>(*d_data,item);
+          SyclKernelLauncherFixed<256, Data, executor_t>(*d_data, group, item);
+        });
       });
     });
 
