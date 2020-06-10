@@ -109,11 +109,11 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
     // Non-trivially copyable
     Iterator* idx = (Iterator*) cl::sycl::malloc_device(sizeof(Iterator), q);
     auto e = q.memcpy(idx, &begin, sizeof(Iterator));
-    e.wait();
+//    e.wait();
 
     LOOP_BODY* lbody = (LOOP_BODY*) cl::sycl::malloc_device(sizeof(LOOP_BODY), q);
     auto e2 = q.memcpy(lbody, &loop_body, sizeof(LOOP_BODY));
-    e2.wait();
+//    e2.wait();
 
     q.submit([&](cl::sycl::handler& h) {
       h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},
@@ -123,15 +123,22 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
         auto privatizer = thread_privatize(*lbody);
         auto& body = privatizer.get_priv();
 
+        auto privatizer2 = thread_privatize(*idx);
+        auto& ix = privatizer2.get_priv();
+
         size_t ii = it.get_global_id(0);
 
         if (ii < len) {
-          body((*idx)[ii]);
+          body(ix[ii]);
         }
       });
     });
 
     if (!Async) { q.wait(); }
+
+    cl::sycl::free(idx, q);
+    cl::sycl::free(lbody, q);
+
   }
 }
 

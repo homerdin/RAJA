@@ -64,6 +64,8 @@ extern syclInfo tl_status;
 
 extern std::unordered_map<cl::sycl::queue, bool> g_stream_info_map;
 
+void setQueue(cl::sycl::queue q);
+
 cl::sycl::queue getQueue();
 
 }  // namespace detail

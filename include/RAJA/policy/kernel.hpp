@@ -3,29 +3,25 @@
  *
  * \file
  *
- * \brief   Header file containing RAJA headers for sycl execution.
+ * \brief   RAJA header file containing constructs used to run kernel::forall
+ *          traversals on GPU with SYCL.
  *
  ******************************************************************************
  */
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-// Copyright (c) 2016-19, Lawrence Livermore National Security, LLC
+// Copyright (c) 2016-20, Lawrence Livermore National Security, LLC
 // and RAJA project contributors. See the RAJA/COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (BSD-3-Clause)
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-#ifndef RAJA_SYCL_HPP
-#define RAJA_SYCL_HPP
+#ifndef RAJA_policy_sycl_kernel_HPP
+#define RAJA_policy_sycl_kernel_HPP
 
-#include "RAJA/config.hpp"
-
-#if defined(RAJA_ENABLE_SYCL)
-
-#include "RAJA/policy/sycl/forall.hpp"
-#include "RAJA/policy/sycl/policy.hpp"
-#include "RAJA/policy/sycl/kernel.hpp"
-
-#endif
+#include "RAJA/policy/sycl/kernel/SyclKernel.hpp"
+#include "RAJA/policy/sycl/kernel/For.hpp"
+#include "RAJA/policy/sycl/kernel/Lambda.hpp"
+#include "RAJA/policy/sycl/kernel/internal.hpp"
 
 #endif  // closing endif for header file include guard
