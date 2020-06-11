@@ -193,8 +193,8 @@ struct SyclLaunchHelper<sycl_launch<async0>,StmtList,Data,Types>
       });
     });
 
-    if (!async) { stream.wait(); };
-
+//    if (!async) { stream.wait(); };
+    stream.wait();
     cl::sycl::free(d_data, stream);
 
   }
