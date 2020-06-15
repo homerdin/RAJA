@@ -118,13 +118,13 @@ struct LaunchDims {
     launch_global.y = launch_threads.y * ((global.y + (launch_threads.y - 1)) / launch_threads.y);
     launch_global.z = launch_threads.z * ((global.z + (launch_threads.z - 1)) / launch_threads.z);
 
-    std::cout << "\nGlobal.x = " << launch_global.x
+/*    std::cout << "\nGlobal.x = " << launch_global.x
               << "\nGlobal.y = " << launch_global.y
               << "\nGlobal.z = " << launch_global.z
               << "\nThreads.x = " << launch_threads.x
               << "\nThreads.y = " << launch_threads.y
               << "\nThreads.z = " << launch_threads.z;
-
+*/
     cl::sycl::range<3> ret_th = {launch_threads.x, launch_threads.y, launch_threads.z};
     cl::sycl::range<3> ret_gl = {launch_global.x, launch_global.y, launch_global.z};
 
