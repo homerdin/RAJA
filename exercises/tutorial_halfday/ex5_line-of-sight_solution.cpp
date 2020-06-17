@@ -262,7 +262,7 @@ int main(int RAJA_UNUSED_ARG(argc), char** RAJA_UNUSED_ARG(argv[]))
 
   using EXEC_POL4 = RAJA::KernelPolicy<
                       RAJA::statement::SyclKernel<
-                        RAJA::statement::For<0, RAJA::sycl_item_2, //RAJA::sycl_exec<SYCL_BLOCK_SIZE>,
+                        RAJA::statement::For<0, RAJA::sycl_group_1_loop, //RAJA::sycl_exec<SYCL_BLOCK_SIZE>,
                           RAJA::statement::Lambda<0>
                         >
                       >

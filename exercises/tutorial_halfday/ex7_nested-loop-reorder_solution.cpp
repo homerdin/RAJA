@@ -159,23 +159,10 @@ int main(int RAJA_UNUSED_ARG(argc), char **RAJA_UNUSED_ARG(argv[]))
   RAJA::TypedRangeSegment<int> dJRange(1, 3);
   RAJA::TypedRangeSegment<int> dIRange(0, 2);
 
-#ifdef Brian
   using IJK_EXEC_POL = RAJA::KernelPolicy<
                          RAJA::statement::SyclKernel<
-                           RAJA::statement::For<0, RAJA::sycl_work_item_1_direct,
-                             RAJA::statement::For<1, RAJA::sycl_work_item_2_direct,
-                               RAJA::statement::For<2, RAJA::sycl_work_item_3_direct,
-                                 RAJA::statement::Lambda<0>
-                               >
-                             >
-                           >
-                         >
-                       >;
-#else
-  using IJK_EXEC_POL = RAJA::KernelPolicy<
-                         RAJA::statement::SyclKernel<
-                           RAJA::statement::For<0, RAJA::sycl_group_1,
-                             RAJA::statement::For<1, RAJA::sycl_item_2,
+                           RAJA::statement::For<0, RAJA::sycl_group_1_loop,
+                             RAJA::statement::For<1, RAJA::sycl_local_1_loop,
                                RAJA::statement::For<2, RAJA::seq_exec,
                                  RAJA::statement::Lambda<0>
                                >
@@ -183,10 +170,6 @@ int main(int RAJA_UNUSED_ARG(argc), char **RAJA_UNUSED_ARG(argv[]))
                            >
                          >
                        >;
-#endif
-
-
-
 
   RAJA::kernel<IJK_EXEC_POL>( RAJA::make_tuple(dIRange, dJRange, dKRange),
   [=] (int i, int j, int k) {

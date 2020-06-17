@@ -46,55 +46,15 @@ template <typename Data, camp::idx_t LambdaIndex, typename... Args, typename Typ
 struct SyclStatementExecutor<Data, statement::Lambda<LambdaIndex, Args...>, Types> {
 
   static
-  inline RAJA_DEVICE void exec(Data &data, cl::sycl::group<3> group, cl::sycl::h_item<3> item)
+  inline RAJA_DEVICE void exec(Data &data, cl::sycl::nd_item<3> item, bool thread_active)
   {
-    // Only execute the lambda if it hasn't been masked off
-//    if(thread_active){
-      StatementExecutor<statement::Lambda<LambdaIndex, Args...>, Types>::exec(data);
-//    }
-
-  }
-/*
-  static
-  inline RAJA_DEVICE void exec(Data &data, cl::sycl::h_item<3> item)
-  {
-
-    // Only execute the lambda if it hasn't been masked off
-//    if(thread_active) {
-      StatementExecutor<statement::Lambda<LambdaIndex, Args...>, Types>::exec(data);
-//    }
-
-  }
-*/
-  static
-  inline
-  LaunchDims calculateDimensions(Data const & RAJA_UNUSED_ARG(data))
-  {
-    return LaunchDims();
-  }
-};
-
-
-//
-/*
-template <typename Data, camp::idx_t LambdaIndex, typename... Args>
-struct SyclStatementExecutor<Data, statement::Lambda<LambdaIndex, Args...>> {
-
-  static
-  inline RAJA_DEVICE void exec(Data &data, bool thread_active)
-  {
-
-    //Convert SegList, ParamList into Seg, Param types, and store in a list
-    using targList = typename camp::flatten<camp::list<Args...>>::type;
-
     // Only execute the lambda if it hasn't been masked off
     if(thread_active){
-      invoke_lambda_with_args<LambdaIndex, targList>(data);
+      StatementExecutor<statement::Lambda<LambdaIndex, Args...>, Types>::exec(data);
     }
 
   }
 
-
   static
   inline
   LaunchDims calculateDimensions(Data const & RAJA_UNUSED_ARG(data))
@@ -102,7 +62,6 @@ struct SyclStatementExecutor<Data, statement::Lambda<LambdaIndex, Args...>> {
     return LaunchDims();
   }
 };
-*/
 
 }  // namespace internal
 }  // namespace RAJA
