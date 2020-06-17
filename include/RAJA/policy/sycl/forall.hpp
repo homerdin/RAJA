@@ -92,8 +92,7 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
   //
   Iterator begin = std::begin(iter);
   Iterator end = std::end(iter);
-  size_t len = std::distance(begin, end);
-  IndexType offset = *begin;
+  IndexType len = std::distance(begin, end);
 
   // Only launch kernel if we have something to iterate over
   if (len > 0 && BlockSize > 0) {
@@ -101,36 +100,31 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
     //
     // Compute the number of blocks
     //
-  cl::sycl::range<1> blockSize{BlockSize};
-  cl::sycl::range<1> gridSize = impl::getGridDim(static_cast<size_t>(len), BlockSize);
+    sycl_dim_t blockSize{BlockSize};
+    sycl_dim_t gridSize = impl::getGridDim(static_cast<size_t>(len), BlockSize);
 
-    LOOP_BODY* lbody = (LOOP_BODY*) cl::sycl::malloc_device(sizeof(LOOP_BODY), q);
-    auto e2 = q.memcpy(lbody, &loop_body, sizeof(LOOP_BODY));
-//    e2.wait();
+    cl::sycl::queue q = ::RAJA::sycl::detail::getQueue();
+
+    cl::sycl::buffer<Iterator> d_idx {std::move(&begin), 1};
+    cl::sycl::buffer<LOOP_BODY> d_lbody {std::move(&loop_body), 1};
 
     q.submit([&](cl::sycl::handler& h) {
+
+      auto idx = d_idx.template get_access<cl::sycl::access::mode::read>(h);
+      auto body = d_lbody.template get_access<cl::sycl::access::mode::read>(h);
+
       h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},
                       [=] (cl::sycl::nd_item<1> it) {
-
-        using RAJA::internal::thread_privatize;
-        auto privatizer = thread_privatize(*lbody);
-        auto& body = privatizer.get_priv();
-
-        auto privatizer2 = thread_privatize(*idx);
-        auto& ix = privatizer2.get_priv();
 
         size_t ii = it.get_global_id(0);
 
         if (ii < len) {
-          body(ix[ii]);
+          (body[0])((idx[0])[ii]);
         }
       });
     });
 
     if (!Async) { q.wait(); }
-
-    cl::sycl::free(idx, q);
-    cl::sycl::free(lbody, q);
 
   }
 }
