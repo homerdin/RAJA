@@ -48,11 +48,21 @@ syclInfo tl_status;
 #pragma omp threadprivate(tl_status)
 #endif
 
+cl::sycl::queue* app_q = NULL;
+
+void setQueue(cl::sycl::queue* qu) {
+  app_q = qu;
+}
+
 //! State of raja cuda stream synchronization for cuda reducer objects
 std::unordered_map<cl::sycl::queue, bool> g_stream_info_map{
     {cl::sycl::queue(), true}};
 
 cl::sycl::queue getQueue() {
+  if (app_q != NULL)
+    return *app_q;
+
+  std::cout << "NOT USING Application QUEUE" << std::endl;
   return g_status.stream;
 }
 
