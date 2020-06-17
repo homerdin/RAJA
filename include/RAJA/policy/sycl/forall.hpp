@@ -95,8 +95,6 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
   size_t len = std::distance(begin, end);
   IndexType offset = *begin;
 
-  std::cout << "Begin: " << *begin << "\nEnd: " << *end << std::endl;
-
   // Only launch kernel if we have something to iterate over
   if (len > 0 && BlockSize > 0) {
 
@@ -106,33 +104,79 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
   cl::sycl::range<1> blockSize{BlockSize};
   cl::sycl::range<1> gridSize = impl::getGridDim(static_cast<size_t>(len), BlockSize);
 
-  cl::sycl::queue q(cl::sycl::default_selector{});
+    LOOP_BODY* lbody = (LOOP_BODY*) cl::sycl::malloc_device(sizeof(LOOP_BODY), q);
+    auto e2 = q.memcpy(lbody, &loop_body, sizeof(LOOP_BODY));
+//    e2.wait();
 
-  q.submit([&](cl::sycl::handler& h) {
-    h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},
-                    [=] (cl::sycl::nd_item<1> it) {
+    q.submit([&](cl::sycl::handler& h) {
+      h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},
+                      [=] (cl::sycl::nd_item<1> it) {
 
-      using RAJA::internal::thread_privatize;
-      auto privatizer = thread_privatize(loop_body);
-      auto& body = privatizer.get_priv();
+        using RAJA::internal::thread_privatize;
+        auto privatizer = thread_privatize(*lbody);
+        auto& body = privatizer.get_priv();
 
-      size_t ii = it.get_global_id(0);
-      ii += offset;
+        auto privatizer2 = thread_privatize(*idx);
+        auto& ix = privatizer2.get_priv();
 
-      if (ii < len) {
-        body(ii);
-      }
+        size_t ii = it.get_global_id(0);
+
+        if (ii < len) {
+          body(ix[ii]);
+        }
+      });
     });
-  });
 
-  if (!Async) { q.wait(); }
+    if (!Async) { q.wait(); }
+
+    cl::sycl::free(idx, q);
+    cl::sycl::free(lbody, q);
+
   }
 }
 
+//
+//////////////////////////////////////////////////////////////////////
+//
+// The following function templates iterate over index set segments
+// using the explicitly named segment iteration policy and execute
+// segments as SYCL kernels.
+//
+//////////////////////////////////////////////////////////////////////
+//
+
+/*!
+ ******************************************************************************
+ *
+ * \brief  Sequential iteration over segments of index set and
+ *         SYCL execution for segments.
+ *
+ ******************************************************************************
+ */
+template <typename LoopBody,
+          size_t BlockSize,
+          bool Async,
+          typename... SegmentTypes>
+RAJA_INLINE void forall_impl(ExecPolicy<seq_segit, sycl_exec<BlockSize, Async>>,
+                             const TypedIndexSet<SegmentTypes...>& iset,
+                             LoopBody&& loop_body)
+{
+  int num_seg = iset.getNumSegments();
+  for (int isi = 0; isi < num_seg; ++isi) {
+    iset.segmentCall(isi,
+                     detail::CallForall(),
+                     sycl_exec<BlockSize, true>(),
+                     loop_body);
+  }  // iterate over segments of index set
+
+  if (!Async) {
+    cl::sycl::queue q = ::RAJA::sycl::detail::getQueue();
+    q.wait();
+  };
+}
 
 }  // namespace sycl
 }  // namespace policy
-
 
 }  // namespace RAJA
 

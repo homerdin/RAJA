@@ -36,7 +36,6 @@
 #include "RAJA/util/types.hpp"
 
 #include "RAJA/policy/sycl/policy.hpp"
-//#include "RAJA/policy/sycl/raja_syclerrchk.hpp"
 
 namespace RAJA
 {
@@ -65,8 +64,7 @@ extern syclInfo tl_status;
 
 extern std::unordered_map<cl::sycl::queue, bool> g_stream_info_map;
 
-}  // namespace detail
-
+void setQueue(cl::sycl::queue* q);
 
 //! Indicate stream is asynchronous
 RAJA_INLINE
@@ -126,6 +124,7 @@ RAJA_INLINE typename std::remove_reference<LOOP_BODY>::type make_launch_body(
   return return_type(std::forward<LOOP_BODY>(loop_body));
 }
 
+}  // namespace detail
 
 }  // namespace sycl
 
