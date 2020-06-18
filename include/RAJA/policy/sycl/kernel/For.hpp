@@ -33,19 +33,19 @@ namespace internal
 //
 
 /*
- * Executor for block work sharing inside SyclKernel.
+ * Executor for local work sharing inside SyclKernel.
  * Mapping directly to indicies
  * Assigns the global index to offset ArgumentId
  */
 template <typename Data,
           camp::idx_t ArgumentId,
           int Dim,
-          int Block_Size,
+          int Local_Size,
           typename... EnclosedStmts,
           typename Types>
 struct SyclStatementExecutor<
     Data,
-    statement::For<ArgumentId, RAJA::sycl_global_123<Dim, Block_Size>, EnclosedStmts...>,
+    statement::For<ArgumentId, RAJA::sycl_global_123<Dim, Local_Size>, EnclosedStmts...>,
     Types> {
 
   using stmt_list_t = StatementList<EnclosedStmts...>;
@@ -76,19 +76,19 @@ struct SyclStatementExecutor<
   {
     auto len = segment_length<ArgumentId>(data);
 
-    // request one block per element in the segment
+    // Set Global Space for Dimension and Local Size
     LaunchDims dims;
     if (Dim == 0) {
       dims.global.x = len;
-      dims.threads.x = Block_Size;
+      dims.local.x = Local_Size;
     }
     if (Dim == 1) {
       dims.global.y = len;
-      dims.threads.y = Block_Size;
+      dims.local.y = Local_Size;
     }
     if (Dim == 2) {
       dims.global.z = len;
-      dims.threads.z = Block_Size;
+      dims.local.z = Local_Size;
     }
 
     // combine with enclosed statements
@@ -98,7 +98,7 @@ struct SyclStatementExecutor<
 };
 
 /*
- * Executor for block work sharing inside SyclKernel.
+ * Executor for group work sharing inside SyclKernel.
  * Mapping directly to indicies
  * Assigns the loop index to offset ArgumentId
  */
@@ -143,13 +143,13 @@ struct SyclStatementExecutor<
     // request one block per element in the segment
     LaunchDims dims;
     if (Dim == 0) {
-      dims.blocks.x = len;
+      dims.group.x = len;
     }
     if (Dim == 1) {
-      dims.blocks.y = len;
+      dims.group.y = len;
     }
     if (Dim == 2) {
-      dims.blocks.z = len;
+      dims.group.z = len;
     }
 
     // combine with enclosed statements
@@ -209,13 +209,13 @@ struct SyclStatementExecutor<
     // request one block per element in the segment
     LaunchDims dims;
     if (Dim == 0) {
-      dims.blocks.x = len;
+      dims.group.x = len;
     } 
     if (Dim == 1) {
-      dims.blocks.y = len;
+      dims.group.y = len;
     }
     if (Dim == 2) {
-      dims.blocks.z = len;
+      dims.group.z = len;
     }
 
     // combine with enclosed statements
@@ -271,13 +271,13 @@ struct SyclStatementExecutor<
     // request one block per element in the segment
     LaunchDims dims;
     if (Dim == 0) {
-      dims.threads.x = len;
+      dims.local.x = len;
     }
     if (Dim == 1) {
-      dims.threads.y = len;
+      dims.local.y = len;
     }
     if (Dim == 2) {
-      dims.threads.z = len;
+      dims.local.z = len;
     }
 
     // combine with enclosed statements
@@ -346,18 +346,18 @@ struct SyclStatementExecutor<
 // TODO
     // request one thread per element in the segment
 //    LaunchDims dims;
-//    set_cuda_dim<ThreadDim>(dims.threads, len);
+//    set_cuda_dim<ThreadDim>(dims.local, len);
 
     // request one block per element in the segment
     LaunchDims dims;
     if (Dim == 0) {
-      dims.threads.x = len;
+      dims.local.x = len;
     }
     if (Dim == 1) {
-      dims.threads.y = len;
+      dims.local.y = len;
     }
     if (Dim == 2) {
-      dims.threads.z = len;
+      dims.local.z = len;
     }
 
     // combine with enclosed statements
@@ -372,14 +372,14 @@ struct SyclStatementExecutor<
  * Mapping directly to indicies
  * Assigns the loop index to offset ArgumentId
  */
-/*template <typename Data,
+template <typename Data,
           camp::idx_t ArgumentId,
-          int Dim,
+          int Local_Size,
           typename... EnclosedStmts,
           typename Types>
 struct SyclStatementExecutor<
     Data,
-    statement::For<ArgumentId, RAJA::sycl_exec<Dim>, EnclosedStmts...>,
+    statement::For<ArgumentId, RAJA::sycl_exec<Local_Size>, EnclosedStmts...>,
     Types> {
 
   using stmt_list_t = StatementList<EnclosedStmts...>;
@@ -416,19 +416,15 @@ struct SyclStatementExecutor<
 
     // request one block per element in the segment
     LaunchDims dims;
-    dims.threads.x = 1;
-    dims.blocks.x = len;// 256 * ((len + 256 -1) / 256);
-//    set_sycl_dim<BlockDim>(dims.blocks, len);
-
-    // since we are direct-mapping, we REQUIRE len
-  //  set_sycl_dim<BlockDim>(dims.min_blocks, len);
+    dims.local.x = Local_Size;
+    dims.global.x = len;
 
     // combine with enclosed statements
     LaunchDims enclosed_dims = enclosed_stmts_t::calculateDimensions(data);
     return dims.max(enclosed_dims);
   }
 };
-*/
+
 /*
  * Executor for sequential loops inside of a SyclKernel.
  *

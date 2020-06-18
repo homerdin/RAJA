@@ -43,7 +43,7 @@
 namespace RAJA
 {
 
-/*!
+/*! TODO
  * SYCL kernel launch policy where the user may specify the number of physical
  * thread blocks and threads per block.
  * If num_blocks is 0 and num_threads is non-zero then num_blocks is chosen at
@@ -59,20 +59,11 @@ namespace RAJA
 template <bool async0>
 struct sycl_launch {};
 
-/*!
- * SYCL kernel launch policy where the user specifies the number of physical
- * thread blocks and threads per block.
- * If num_blocks is 0 then num_blocks is chosen at runtime.
- * Num_blocks is chosen to maximize the number of blocks running concurrently.
- */
-//template <bool async0, size_t num_blocks, size_t num_threads>
-//using sycl_explicit_launch = sycl_launch<async0, num_blocks, num_threads>;
-
 namespace statement
 {
 
 /*!
- * A RAJA::kernel statement that launches a CUDA kernel.
+ * A RAJA::kernel statement that launches a SYCL kernel.
  *
  *
  */
@@ -82,9 +73,8 @@ struct SyclKernelExt
 };
 
 /*!
- * A RAJA::kernel statement that launches a SYCL kernel with a fixed
- * number of threads (specified by num_threads)
- * The kernel launch is asynchronous.
+ * A RAJA::kernel statement that launches a SYCL kernel.
+ * The kernel launch is synchronous.
  */
 template <typename... EnclosedStmts>
 using SyclKernel =
@@ -92,9 +82,13 @@ using SyclKernel =
                   EnclosedStmts...>;
 
 /*!
- *  * A RAJA::kernel statement that launches a CUDA kernel with 1024 threads
- *   * The kernel launch is synchronous.
- *    */
+ * A RAJA::kernel statement that launches a SYCL kernel.
+ * The kernel launch is asynchronous.
+ */
+template <typename... EnclosedStmts>
+using SyclKernelAsync =
+    SyclKernelExt<sycl_launch<true>,
+                  EnclosedStmts...>;
 
 } // namespace statement
 
@@ -119,24 +113,6 @@ void SyclKernelLauncher(Data data, cl::sycl::nd_item<3> item)
   Exec::exec(private_data, item, true);
 }
 
-/*!
- * Helper class that handles getting the correct global function for
- * SyclKernel policies. This class is specialized on whether or not BlockSize
- * is fixed at compile time.
- *
- * The default case handles BlockSize != 0 and gets the fixed max block size
- * version of the kernel.
- */
-/*template<size_t BlockSize, typename Data, typename executor_t>
-struct SyclKernelLauncherGetter
-{
-  using type = camp::decay<decltype(&internal::SyclKernelLauncherFixed<BlockSize, Data, executor_t>)>;
-  static constexpr type get() noexcept
-  {
-    return internal::SyclKernelLauncherFixed<BlockSize, Data, executor_t>;
-  }
-};
-*/
 /*!
  * Helper class that handles SYCL kernel launching, and computing
  * maximum number of threads/blocks
@@ -184,13 +160,10 @@ struct SyclLaunchHelper<sycl_launch<async0>,StmtList,Data,Types>
 
   }
 };
-// SyclLaunchHelper, actually launches the kernel
-// Also StatementExecutor with LaunchConfig
-
 
 /*!
- *  * Specialization that launches SYCL kernels for RAJA::kernel from host code
- *   */
+ * Specialization that launches SYCL kernels for RAJA::kernel from host code
+ */
 template <typename LaunchConfig, typename... EnclosedStmts, typename Types>
 struct StatementExecutor<
     statement::SyclKernelExt<LaunchConfig, EnclosedStmts...>, Types> {
@@ -207,25 +180,14 @@ struct StatementExecutor<
     using executor_t = sycl_statement_list_executor_t<stmt_list_t, data_t, Types>;
     using launch_t = SyclLaunchHelper<LaunchConfig, stmt_list_t, data_t, Types>;
 
-//    std::cout << "entry into launch" << std::endl;
-
-//    SyclForWrapper<Data, Types, EnclosedStmts...> for_wrapper(data);
-
     //
     // Compute the requested kernel dimensions
     //
     LaunchDims launch_dims = executor_t::calculateDimensions(data);
     
-    //LaunchDims launch_dims;
- //   launch_dims.threads = segment_length<ArgumentId>(data); 
-   // launch_dims.blocks = 256 * ((launch_dims.threads + 256 -1) / 256);
-
     int shmem = 0;
-//    cl::sycl::queue stream;
     cl::sycl::queue q = ::RAJA::sycl::detail::getQueue();
 
-//    auto sycl_data = RAJA::sycl::make_launch_body(
-//         launch_dims.blocks, launch_dims.threads, shmem, stream, data);
     //
     // Launch the kernels
     //

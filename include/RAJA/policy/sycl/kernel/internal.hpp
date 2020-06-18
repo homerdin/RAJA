@@ -39,39 +39,26 @@
 namespace RAJA
 {
 
-/*!
- * Policy for For<>, executes loop iteration by distributing them over threads
- * and blocks, but limiting the number of threads to num_threads.
- */
-/*template <size_t num_threads>
-struct sycl_threadblock_exec
-    : public make_policy_pattern_launch_platform_t<
-          Policy::sycl,
-          Pattern::forall,
-          Launch::undefined,
-          Platform::sycl> {
-};*/
-
 namespace internal
 {
 
 // LaunchDims and Helper functions
 struct LaunchDims {
-  sycl_dim_3_t blocks;
-  sycl_dim_3_t threads;
+  sycl_dim_3_t group;
+  sycl_dim_3_t local;
   sycl_dim_3_t global;
 
   RAJA_INLINE
   RAJA_HOST_DEVICE
-  LaunchDims() : blocks{1,1,1}, // min_blocks{0},
-                 threads{1,1,1},
-                 global{1,1,1} {}//, min_threads{0} {}
+  LaunchDims() : group{0,0,0}, // min_group{0},
+                 local{1,1,1},
+                 global{1,1,1} {}//, min_local{0} {}
 
   RAJA_INLINE
   RAJA_HOST_DEVICE
   LaunchDims(LaunchDims const &c) :
-  blocks(c.blocks),//   min_blocks(c.min_blocks),
-  threads(c.threads),//, min_threads(c.min_threads)
+  group(c.group),//   min_group(c.min_group),
+  local(c.local),//, min_local(c.min_local)
   global(c.global)
   {
   }
@@ -81,13 +68,13 @@ struct LaunchDims {
   {
     LaunchDims result;
 
-    result.blocks.x = std::max(c.blocks.x, blocks.x);
-    result.blocks.y = std::max(c.blocks.y, blocks.y);
-    result.blocks.z = std::max(c.blocks.z, blocks.z);
+    result.group.x = std::max(c.group.x, group.x);
+    result.group.y = std::max(c.group.y, group.y);
+    result.group.z = std::max(c.group.z, group.z);
 
-    result.threads.x = std::max(c.threads.x, threads.x);
-    result.threads.y = std::max(c.threads.y, threads.y);
-    result.threads.z = std::max(c.threads.z, threads.z);
+    result.local.x = std::max(c.local.x, local.x);
+    result.local.y = std::max(c.local.y, local.y);
+    result.local.z = std::max(c.local.z, local.z);
 
     result.global.x = std::max(c.global.x, global.x);
     result.global.y = std::max(c.global.y, global.y);
@@ -98,34 +85,37 @@ struct LaunchDims {
 
   cl::sycl::nd_range<3> fit_nd_range() {
 
-    cl::sycl::queue q = ::RAJA::sycl::detail::getQueue();
-    auto sizes = q.get_device().get_info<cl::sycl::info::device::max_work_item_sizes>();
-
-//    sycl_dim_3_t launch_threads {sizes.get(0), sizes.get(1)/3, sizes.get(2)/3};
-    sycl_dim_3_t launch_threads;
-    launch_threads.x = threads.x;  //std::min(launch_threads.x, threads.x); 
-    launch_threads.y = threads.y;  //std::min(launch_threads.y, threads.y);
-    launch_threads.z = threads.z; //std::min(launch_threads.z, threads.z);
-//    sycl_dim_3_t launch_threads {256, 1, 1};
-
-    sycl_dim_3_t launch_blocks;
-    launch_blocks.x = launch_threads.x * blocks.x;
-    launch_blocks.y = launch_threads.y * blocks.y;
-    launch_blocks.z = launch_threads.z * blocks.z;
-
     sycl_dim_3_t launch_global;
-    launch_global.x = launch_threads.x * ((global.x + (launch_threads.x - 1)) / launch_threads.x);
-    launch_global.y = launch_threads.y * ((global.y + (launch_threads.y - 1)) / launch_threads.y);
-    launch_global.z = launch_threads.z * ((global.z + (launch_threads.z - 1)) / launch_threads.z);
 
-/*    std::cout << "\nGlobal.x = " << launch_global.x
+    sycl_dim_3_t launch_local {1,1,1};
+    launch_local.x = std::max(launch_local.x, local.x); 
+    launch_local.y = std::max(launch_local.y, local.y);
+    launch_local.z = std::max(launch_local.z, local.z);
+
+
+// User gave group policy, use to calculate global space
+    if (group.x != 0 || group.y != 0 || group.z != 0) {
+      sycl_dim_3_t launch_group {1,1,1};
+      launch_group.x = std::max(launch_group.x, group.x)
+      launch_group.y = std::max(launch_group.y, group.y);
+      launch_group.z = std::max(launch_group.z, group.z);
+
+      launch_global.x = launch_local.x * launch_group.x;
+      launch_global.y = launch_local.y * launch_group.y; 
+      launch_global.z = launch_local.z * launch_group.z;
+    } else {
+      launch_global.x = launch_local.x * ((global.x + (launch_local.x - 1)) / launch_local.x);
+      launch_global.y = launch_local.y * ((global.y + (launch_local.y - 1)) / launch_local.y);
+      launch_global.z = launch_local.z * ((global.z + (launch_local.z - 1)) / launch_local.z);
+    }
+    std::cout << "\nGlobal.x = " << launch_global.x
               << "\nGlobal.y = " << launch_global.y
               << "\nGlobal.z = " << launch_global.z
-              << "\nThreads.x = " << launch_threads.x
-              << "\nThreads.y = " << launch_threads.y
-              << "\nThreads.z = " << launch_threads.z;
-*/
-    cl::sycl::range<3> ret_th = {launch_threads.x, launch_threads.y, launch_threads.z};
+              << "\nThreads.x = " << launch_local.x
+              << "\nThreads.y = " << launch_local.y
+              << "\nThreads.z = " << launch_local.z;
+
+    cl::sycl::range<3> ret_th = {launch_local.x, launch_local.y, launch_local.z};
     cl::sycl::range<3> ret_gl = {launch_global.x, launch_global.y, launch_global.z};
 
     return cl::sycl::nd_range<3>(ret_gl, ret_th);
