@@ -105,13 +105,9 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
 
     cl::sycl::queue q = ::RAJA::sycl::detail::getQueue();
 
-    cl::sycl::buffer<Iterator> d_idx {std::move(&begin), 1};
     cl::sycl::buffer<LOOP_BODY> d_lbody {std::move(&loop_body), 1};
 
     q.submit([&](cl::sycl::handler& h) {
-
-      auto idx = d_idx.template get_access<cl::sycl::access::mode::read>(h);
-      auto body = d_lbody.template get_access<cl::sycl::access::mode::read>(h);
 
       h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},
                       [=] (cl::sycl::nd_item<1> it) {
@@ -119,7 +115,7 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
         size_t ii = it.get_global_id(0);
 
         if (ii < len) {
-          (body[0])((idx[0])[ii]);
+          loop_body(begin[ii]);
         }
       });
     });
