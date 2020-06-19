@@ -105,8 +105,6 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
 
     cl::sycl::queue q = ::RAJA::sycl::detail::getQueue();
 
-    cl::sycl::buffer<LOOP_BODY> d_lbody {std::move(&loop_body), 1};
-
     q.submit([&](cl::sycl::handler& h) {
 
       h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},

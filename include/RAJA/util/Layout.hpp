@@ -122,6 +122,9 @@ public:
   {
   }
 
+  LayoutBase_impl(LayoutBase_impl const &) = default;
+  ~LayoutBase_impl() = default;
+
   /*!
    * Construct a layout given the size of each dimension.
    */

@@ -142,16 +142,12 @@ struct SyclLaunchHelper<sycl_launch<async0>,StmtList,Data,Types>
                      cl::sycl::queue stream)
   {
 
-    cl::sycl::buffer<data_t> d_data (std::move(&data), 1);
-
     stream.submit([&](cl::sycl::handler& h) {
-
-      auto data = d_data.template get_access<cl::sycl::access::mode::read>(h);
  
       h.parallel_for(launch_dims.fit_nd_range(),
                      [=] (cl::sycl::nd_item<3> item) {
         
-        SyclKernelLauncher<Data, executor_t>(data[0], item);
+        SyclKernelLauncher<Data, executor_t>(data, item);
 
       });
     });

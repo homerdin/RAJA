@@ -81,6 +81,9 @@ struct Span {
   {
   }
 
+  Span(Span const &) = default;
+  ~Span() = default;
+
   RAJA_HOST_DEVICE RAJA_INLINE iterator begin() const { return m_begin; }
   RAJA_HOST_DEVICE RAJA_INLINE iterator end() const { return m_end; }
   RAJA_HOST_DEVICE RAJA_INLINE const_iterator cbegin() const { return m_begin; }

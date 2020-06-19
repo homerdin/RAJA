@@ -71,6 +71,9 @@ struct View {
   {
   }
 
+  ~View() = default;
+
+#ifndef __SYCL_DEVICE_ONLY__
   // We found the compiler-generated copy constructor does not actually
   // copy-construct the object on the device in certain nvcc versions. By
   // explicitly defining the copy constructor we are able ensure proper
@@ -79,6 +82,9 @@ struct View {
       : layout(V.layout), data(V.data)
   {
   }
+#else
+  constexpr View(View const& ) = default;
+#endif
 
   template <bool IsConstView = std::is_const<value_type>::value>
   RAJA_INLINE constexpr View(
@@ -132,6 +138,9 @@ struct TypedViewBase {
       : base_(data_ptr, std::forward<CLayoutType>(layout))
   {
   }
+
+  TypedViewBase(TypedViewBase const & ) = default;
+  ~TypedViewBase() = default;
 
   RAJA_INLINE void set_data(PointerType data_ptr) { base_.set_data(data_ptr); }
 

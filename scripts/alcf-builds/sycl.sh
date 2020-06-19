@@ -33,8 +33,8 @@ cmake \
   -DENABLE_NO_LIBS=On \
   -DENABLE_SYCL=On \
   -DCMAKE_LINKER=clang++ \
-  -DENABLE_TESTS=On \
-  -DENABLE_EXAMPLES=On \
+  -DENABLE_TESTS=Off \
+  -DENABLE_EXAMPLES=Off \
   "$@" \
   ..
 

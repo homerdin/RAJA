@@ -96,7 +96,7 @@ struct LaunchDims {
 // User gave group policy, use to calculate global space
     if (group.x != 0 || group.y != 0 || group.z != 0) {
       sycl_dim_3_t launch_group {1,1,1};
-      launch_group.x = std::max(launch_group.x, group.x)
+      launch_group.x = std::max(launch_group.x, group.x);
       launch_group.y = std::max(launch_group.y, group.y);
       launch_group.z = std::max(launch_group.z, group.z);
 
@@ -108,13 +108,22 @@ struct LaunchDims {
       launch_global.y = launch_local.y * ((global.y + (launch_local.y - 1)) / launch_local.y);
       launch_global.z = launch_local.z * ((global.z + (launch_local.z - 1)) / launch_local.z);
     }
-    std::cout << "\nGlobal.x = " << launch_global.x
+
+
+    // TODO: Update. Requested local sizes need to fit (256 for gen9)
+    while ( launch_local.x * launch_local.y * launch_local.z > 256) {
+      launch_local.x = sqrt(launch_local.x);
+      launch_local.y = sqrt(launch_local.y);
+      launch_local.z = sqrt(launch_local.z);
+    }
+
+/*    std::cout << "\nGlobal.x = " << launch_global.x
               << "\nGlobal.y = " << launch_global.y
               << "\nGlobal.z = " << launch_global.z
               << "\nThreads.x = " << launch_local.x
               << "\nThreads.y = " << launch_local.y
               << "\nThreads.z = " << launch_local.z;
-
+*/
     cl::sycl::range<3> ret_th = {launch_local.x, launch_local.y, launch_local.z};
     cl::sycl::range<3> ret_gl = {launch_global.x, launch_global.y, launch_global.z};
 
