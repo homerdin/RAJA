@@ -138,6 +138,93 @@ using sycl_local_1_direct = sycl_local_123_direct<0>;
 using sycl_local_2_direct = sycl_local_123_direct<1>;
 using sycl_local_3_direct = sycl_local_123_direct<2>;
 
+
+namespace internal{
+
+template<int dim>
+struct SyclDimHelper;
+
+template<>
+struct SyclDimHelper<0>{
+
+  template<typename dim_t>
+  inline
+  static
+  constexpr
+  auto get(dim_t const &d) ->
+    decltype(d.x)
+  {
+    return d.x;
+  }
+
+  template<typename dim_t>
+  inline
+  static
+  void set(dim_t &d, int value)
+  {
+    d.x = value;
+  }
+};
+
+template<>
+struct SyclDimHelper<1>{
+
+  template<typename dim_t>
+  inline
+  static
+  constexpr
+  auto get(dim_t const &d) ->
+    decltype(d.x)
+  {
+    return d.y;
+  }
+
+  template<typename dim_t>
+  inline
+  static
+  void set(dim_t &d, int value)
+  {
+    d.y = value;
+  }
+};
+
+template<>
+struct SyclDimHelper<2>{
+
+  template<typename dim_t>
+  inline
+  static
+  constexpr
+  auto get(dim_t const &d) ->
+    decltype(d.x)
+  {
+    return d.z;
+  }
+
+  template<typename dim_t>
+  inline
+  static
+  void set(dim_t &d, int value)
+  {
+    d.z = value;
+  }
+};
+
+template<int dim, typename dim_t>
+constexpr
+auto get_sycl_dim(dim_t const &d) ->
+  decltype(d.x)
+{
+  return SyclDimHelper<dim>::get(d);
+}
+
+template<int dim, typename dim_t>
+void set_sycl_dim(dim_t &d, int value)
+{
+  return SyclDimHelper<dim>::set(d, value);
+}
+} // namespace internal
+
 }  // namespace RAJA
 
 #endif
