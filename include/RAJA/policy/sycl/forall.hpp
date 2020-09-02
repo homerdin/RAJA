@@ -103,12 +103,68 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
     sycl_dim_t blockSize{BlockSize};
     sycl_dim_t gridSize = impl::getGridDim(static_cast<size_t>(len), BlockSize);
 
-    cl::sycl::queue q = ::RAJA::sycl::detail::getQueue();
+    cl::sycl::queue* q = ::RAJA::sycl::detail::getQueue();
 
-    q.submit([&](cl::sycl::handler& h) {
+    LOOP_BODY* lbody = (LOOP_BODY*) cl::sycl::malloc_device(sizeof(LOOP_BODY), *q);
+    auto e = q->memcpy(lbody, &loop_body, sizeof(LOOP_BODY));
+    e.wait();
+
+    Iterator* beg = (Iterator*) cl::sycl::malloc_device(sizeof(Iterator), *q);
+    auto e2 = q->memcpy(beg, &begin, sizeof(Iterator));
+    e2.wait();
+
+    q->submit([&](cl::sycl::handler& h) {
 
       h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},
-                      [=] (cl::sycl::nd_item<1> it) {
+                      [=]  (cl::sycl::nd_item<1> it) {
+
+        size_t ii = it.get_global_id(0);
+
+        if (ii < len) {
+          (*lbody)((*beg)[ii]);
+        }
+      });
+    });
+
+    if (true/*!Async*/) { q->wait(); }
+
+    cl::sycl::free(lbody, *q);
+    cl::sycl::free(beg, *q);
+  }
+}
+
+template <typename Iterable, typename LoopBody, size_t BlockSize, bool Async>
+RAJA_INLINE void forall_impl(sycl_exec_trivial<BlockSize, Async>,
+                             Iterable&& iter,
+                             LoopBody&& loop_body)
+{
+
+  using Iterator  = camp::decay<decltype(std::begin(iter))>;
+  using LOOP_BODY = camp::decay<LoopBody>;
+  using IndexType = camp::decay<decltype(std::distance(std::begin(iter), std::end(iter)))>;
+
+  //
+  // Compute the requested iteration space size
+  //
+  Iterator begin = std::begin(iter);
+  Iterator end = std::end(iter);
+  IndexType len = std::distance(begin, end);
+
+  // Only launch kernel if we have something to iterate over
+  if (len > 0 && BlockSize > 0) {
+
+    //
+    // Compute the number of blocks
+    //
+    sycl_dim_t blockSize{BlockSize};
+    sycl_dim_t gridSize = impl::getGridDim(static_cast<size_t>(len), BlockSize);
+
+    cl::sycl::queue* q = ::RAJA::sycl::detail::getQueue();
+
+    q->submit([&](cl::sycl::handler& h) {
+
+      h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},
+                      [=]  (cl::sycl::nd_item<1> it) {
 
         size_t ii = it.get_global_id(0);
 
@@ -118,7 +174,7 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
       });
     });
 
-    if (!Async) { q.wait(); }
+    if (!Async) { q->wait(); }
 
   }
 }
@@ -158,8 +214,8 @@ RAJA_INLINE void forall_impl(ExecPolicy<seq_segit, sycl_exec<BlockSize, Async>>,
   }  // iterate over segments of index set
 
   if (!Async) {
-    cl::sycl::queue q = ::RAJA::sycl::detail::getQueue();
-    q.wait();
+    cl::sycl::queue* q = ::RAJA::sycl::detail::getQueue();
+    q->wait();
   };
 }
 

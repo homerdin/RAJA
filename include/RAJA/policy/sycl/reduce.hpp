@@ -5,25 +5,24 @@
 // SPDX-License-Identifier: (BSD-3-Clause)
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-#ifndef RAJA_sycl_target_reduce_HPP
-#define RAJA_sycl_target_reduce_HPP
+#ifndef RAJA_sycl_reduce_HPP
+#define RAJA_sycl_reduce_HPP
 
 #include "RAJA/config.hpp"
 
 #if defined(RAJA_ENABLE_SYCL)
 
-//#include <cassert>  // Leaving out until XL is fixed 2/25/2019.
-
 #include <algorithm>
 
-#include <CL/sycl.hpp>
 
 #include "RAJA/util/types.hpp"
 
 #include "RAJA/pattern/reduce.hpp"
 
-#include "RAJA/policy/openmp/policy.hpp"
-
+#include "RAJA/policy/sycl/policy.hpp"
+//#include <CL/__spirv/spirv_vars.hpp>
+//#include <CL/sycl/intel/atomic_ref.hpp>
+//#include <CL/sycl/detail/defines.hpp>
 
 namespace RAJA
 {
@@ -65,20 +64,19 @@ struct maxloc
 
 // Alias for clarity. Reduction size operates on number of omp teams.
 // Ideally, MaxNumTeams = ThreadsPerTeam in omp_target_parallel_for_exec.
-//static constexpr int MaxNumTeams = policy::omp::MAXNUMTHREADS;
+static int MaxNumTeams = 256;
 
 //! Information necessary for OpenMP offload to be considered
 struct Offload_Info 
 {
-  cl::sycl::queue q(cl::sycl::default_selector{});
-//  int hostID{omp_get_initial_device()};
-//  int deviceID{omp_get_default_device()};
+  int hostID{1};
+  int deviceID{2};
   bool isMapped{false};
 
   Offload_Info() = default;
 
   Offload_Info(const Offload_Info &other)
-      : q{other.q}, /*hostID{other.hostID}, deviceID{other.deviceID},*/ isMapped{other.isMapped}
+      : hostID{other.hostID}, deviceID{other.deviceID}, isMapped{other.isMapped}
   {
   }
 };
@@ -102,8 +100,8 @@ struct Reduce_Data
   Reduce_Data(T /*defaultValue*/, T identityValue, Offload_Info &info)
       : value(identityValue),
         device{reinterpret_cast<T *>(
-            omp_target_alloc(omp::MaxNumTeams * sizeof(T), info.deviceID))},
-        host{new T[omp::MaxNumTeams]}
+            cl::sycl::malloc_device(sycl::MaxNumTeams * sizeof(T),*(::RAJA::sycl::detail::getQueue())))},
+        host{new T[sycl::MaxNumTeams]}
   {
     if (!host) {
       printf("Unable to allocate space on host\n");
@@ -113,7 +111,7 @@ struct Reduce_Data
       printf("Unable to allocate space on device\n");
       exit(1);
     }
-    std::fill_n(host, omp::MaxNumTeams, identityValue);
+    std::fill_n(host, sycl::MaxNumTeams, identityValue);
     hostToDevice(info);
   }
 
@@ -123,40 +121,35 @@ struct Reduce_Data
   //! transfers from the host to the device -- exit() is called upon failure
   RAJA_INLINE void hostToDevice(Offload_Info &info)
   {
+    cl::sycl::queue* q = ::RAJA::sycl::detail::getQueue();
+
     // precondition: host and device are valid pointers
-    if (omp_target_memcpy(reinterpret_cast<void *>(device),
-                          reinterpret_cast<void *>(host),
-                          omp::MaxNumTeams * sizeof(T),
-                          0,
-                          0,
-                          info.deviceID,
-                          info.hostID) != 0) {
-      printf("Unable to copy memory from host to device\n");
-      exit(1);
-    }
+    auto e = q->memcpy(reinterpret_cast<void *>(device),
+                       reinterpret_cast<void *>(host),
+                       sycl::MaxNumTeams * sizeof(T));
+
+    e.wait();
   }
 
   //! transfers from the device to the host -- exit() is called upon failure
   RAJA_INLINE void deviceToHost(Offload_Info &info)
   {
+    cl::sycl::queue* q = ::RAJA::sycl::detail::getQueue();
+
     // precondition: host and device are valid pointers
-    if (omp_target_memcpy(reinterpret_cast<void *>(host),
-                          reinterpret_cast<void *>(device),
-                          omp::MaxNumTeams * sizeof(T),
-                          0,
-                          0,
-                          info.hostID,
-                          info.deviceID) != 0) {
-      printf("Unable to copy memory from device to host\n");
-      exit(1);
-    }
+    auto e = q->memcpy(reinterpret_cast<void *>(host),
+                       reinterpret_cast<void *>(device),
+                       sycl::MaxNumTeams * sizeof(T));
+    
+    e.wait();
   }
 
   //! frees all data from the offload information passed
   RAJA_INLINE void cleanup(Offload_Info &info)
   {
     if (device) {
-      omp_target_free(reinterpret_cast<void *>(device), info.deviceID);
+      cl::sycl::queue* q = ::RAJA::sycl::detail::getQueue();
+      cl::sycl::free(reinterpret_cast<void *>(device), *q);
       device = nullptr;
     }
     if (host) {
@@ -166,7 +159,7 @@ struct Reduce_Data
   }
 };
 
-}  // end namespace omp
+}  // end namespace sycl
 
 //! OpenMP Target Reduction entity -- generalize on # of teams, reduction, and
 //! type
@@ -184,24 +177,18 @@ struct TargetReduce
   {
   }
 
-#ifdef __ibmxl__ // TODO: implicit declare target doesn't pick this up
-#pragma omp declare target
-#endif
   //! apply reduction on device upon destruction
   ~TargetReduce()
   {
     //assert ( omp_get_num_teams() <= omp::MaxNumTeams );  // Leaving out until XL is fixed 2/25/2019.
-    if (!omp_is_initial_device()) {
-#pragma omp critical
-      {
-        int tid = omp_get_team_num();
-        Reducer{}(val.device[tid], val.value);
-      }
-    }
+//    if (!omp_is_initial_device()) {
+//#pragma omp critical
+//      {
+  //      int tid = omp_get_team_num();
+    //    Reducer{}(val.device[tid], val.value);
+      //}
+   // }
   }
-#ifdef __ibmxl__ // TODO: implicit declare target doesn't pick this up
-#pragma omp end declare target
-#endif
 
   //! map result value back to host if not done already; return aggregate value
   operator T()
@@ -209,7 +196,8 @@ struct TargetReduce
     if (!info.isMapped) {
       val.deviceToHost(info);
 
-      for (int i = 0; i < omp::MaxNumTeams; ++i) {
+      for (int i = 0; i < sycl::MaxNumTeams; ++i) {
+//        std::cout << "host[" << i << "] = " << val.host[i] << std::endl;
         Reducer{}(val.value, val.host[i]);
       }
       val.cleanup(info);
@@ -226,22 +214,42 @@ struct TargetReduce
   //! apply reduction
   TargetReduce &reduce(T rhsVal)
   {
-    Reducer{}(val.value, rhsVal);
+#ifdef __SYCL_DEVICE_ONLY__
+    auto i = 0; //__spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
+    auto atm = cl::sycl::intel::atomic_ref<T, cl::sycl::intel::memory_order::relaxed, cl::sycl::intel::memory_scope::device, cl::sycl::access::address_space::global_space>(val.device[i]);
+    Reducer{}(atm, rhsVal);
     return *this;
+#else
+    auto i = 0;
+    Reducer{}(val.device[i], rhsVal);
+    return *this;
+#endif
   }
 
   //! apply reduction (const version) -- still reduces internal values
   const TargetReduce &reduce(T rhsVal) const
   {
-    Reducer{}(val.value, rhsVal);
+#ifdef __SYCL_DEVICE_ONLY__
+    auto i = 0; //__spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
+    auto atm = cl::sycl::intel::atomic_ref<T, cl::sycl::intel::memory_order::relaxed, cl::sycl::intel::memory_scope::device, cl::sycl::access::address_space::global_space>(val.device[i]);
+    atm.fetch_add(rhsVal);  
+//    Reducer{}(atm, rhsVal);
     return *this;
+#else
+    auto i = 0;
+    Reducer{}(val.device[i], rhsVal);
+    return *this;
+#endif
   }
+
+  //! storage for reduction data (host ptr, device ptr, value)
+  sycl::Reduce_Data<T> val;
 
 private:
   //! storage for offload information (host ID, device ID)
-  omp::Offload_Info info;
+  sycl::Offload_Info info;
   //! storage for reduction data (host ptr, device ptr, value)
-  omp::Reduce_Data<T> val;
+//  sycl::Reduce_Data<T> val;
   T initVal;
   T finalVal;
 };
@@ -268,13 +276,13 @@ struct TargetReduceLoc
   ~TargetReduceLoc()
   {
     //assert ( omp_get_num_teams() <= omp::MaxNumTeams );  // Leaving out until XL is fixed 2/25/2019.
-    if (!omp_is_initial_device()) {
-#pragma omp critical
-      {
-        int tid = omp_get_team_num();
-        Reducer{}(val.device[tid], loc.device[tid], val.value, loc.value);
-      }
-    }
+//    if (!omp_is_initial_device()) {
+//#pragma omp critical
+//      {
+//        int tid = omp_get_team_num();
+//        Reducer{}(val.device[tid], loc.device[tid], val.value, loc.value);
+  //    }
+    //}
   }
 
   //! map result value back to host if not done already; return aggregate value
@@ -283,7 +291,7 @@ struct TargetReduceLoc
     if (!info.isMapped) {
       val.deviceToHost(info);
       loc.deviceToHost(info);
-      for (int i = 0; i < omp::MaxNumTeams; ++i) {
+      for (int i = 0; i < sycl::MaxNumTeams; ++i) {
         Reducer{}(val.value, loc.value, val.host[i], loc.host[i]);
       }
       val.cleanup(info);
@@ -322,13 +330,16 @@ struct TargetReduceLoc
     return *this;
   }
 
+  //! storage for reduction data for value
+  sycl::Reduce_Data<T> val;
+
 private:
   //! storage for offload information
-  omp::Offload_Info info;
+  sycl::Offload_Info info;
   //! storage for reduction data for value
-  omp::Reduce_Data<T> val;
+//  sycl::Reduce_Data<T> val;
   //! storage for redcution data for location
-  omp::Reduce_Data<IndexType> loc;
+  sycl::Reduce_Data<IndexType> loc;
   T initVal;
   T finalVal;
   IndexType initLoc;
@@ -338,12 +349,12 @@ private:
 
 //! specialization of ReduceSum for omp_target_reduce
 template <typename T>
-class ReduceSum<omp_target_reduce, T>
+class ReduceSum<sycl_reduce, T>
     : public TargetReduce<RAJA::reduce::sum<T>, T>
 {
 public:
 
-  using self = ReduceSum<omp_target_reduce, T>;
+  using self = ReduceSum<sycl_reduce, T>;
   using parent = TargetReduce<RAJA::reduce::sum<T>, T>;
   using parent::parent;
 
@@ -357,75 +368,110 @@ public:
   //! enable operator+= for ReduceSum -- alias for reduce()
   const self &operator+=(T rhsVal) const
   {
+#ifdef __SYCL_DEVICE_ONLY__
+    auto i = __spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
+    auto atm = cl::sycl::intel::atomic_ref<T, cl::sycl::intel::memory_order::relaxed, cl::sycl::intel::memory_scope::device, cl::sycl::access::address_space::global_space>(parent::val.device[i]);
+    atm.fetch_add(rhsVal);
+    return *this;
+#else
     parent::reduce(rhsVal);
     return *this;
+#endif
   }
 };
 
 
 //! specialization of ReduceMin for omp_target_reduce
 template <typename T>
-class ReduceMin<omp_target_reduce, T>
+class ReduceMin<sycl_reduce, T>
     : public TargetReduce<RAJA::reduce::min<T>, T>
 {
 public:
 
-  using self = ReduceMin<omp_target_reduce, T>;
+  using self = ReduceMin<sycl_reduce, T>;
   using parent = TargetReduce<RAJA::reduce::min<T>, T>;
   using parent::parent;
 
   //! enable min() for ReduceMin -- alias for reduce()
   self &min(T rhsVal)
   {
+#ifdef __SYCL_DEVICE_ONLY__
+    auto i = 0;//__spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
+    auto atm = cl::sycl::intel::atomic_ref<T, cl::sycl::intel::memory_order::relaxed, cl::sycl::intel::memory_scope::device, cl::sycl::access::address_space::global_space>(parent::val.device[i]);
+    atm.fetch_min(rhsVal);
+    return *this;
+#else
     parent::reduce(rhsVal);
     return *this;
+#endif
   }
 
   //! enable min() for ReduceMin -- alias for reduce()
   const self &min(T rhsVal) const
   {
+#ifdef __SYCL_DEVICE_ONLY__
+    auto i = 0;//__spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
+    auto atm = cl::sycl::intel::atomic_ref<T, cl::sycl::intel::memory_order::relaxed, cl::sycl::intel::memory_scope::device, cl::sycl::access::address_space::global_space>(parent::val.device[i]);
+    atm.fetch_min(rhsVal);
+    return *this;
+#else
     parent::reduce(rhsVal);
     return *this;
+#endif
   }
 };
 
 
 //! specialization of ReduceMax for omp_target_reduce
 template <typename T>
-class ReduceMax<omp_target_reduce, T>
+class ReduceMax<sycl_reduce, T>
     : public TargetReduce<RAJA::reduce::max<T>, T>
 {
 public:
 
-  using self = ReduceMax<omp_target_reduce, T>;
+  using self = ReduceMax<sycl_reduce, T>;
   using parent = TargetReduce<RAJA::reduce::max<T>, T>;
   using parent::parent;
 
   //! enable max() for ReduceMax -- alias for reduce()
   self &max(T rhsVal)
   {
+#ifdef __SYCL_DEVICE_ONLY__
+    auto i = 0;//__spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
+    auto atm = cl::sycl::intel::atomic_ref<T, cl::sycl::intel::memory_order::relaxed, cl::sycl::intel::memory_scope::device, cl::sycl::access::address_space::global_space>(parent::val.device[i]);
+    atm.fetch_max(rhsVal);
+    return *this;
+#else
     parent::reduce(rhsVal);
     return *this;
+#endif
   }
 
   //! enable max() for ReduceMax -- alias for reduce()
   const self &max(T rhsVal) const
   {
+#ifdef __SYCL_DEVICE_ONLY__
+    auto i = 0;//__spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
+    auto atm = cl::sycl::intel::atomic_ref<T, cl::sycl::intel::memory_order::relaxed, cl::sycl::intel::memory_scope::device, cl::sycl::access::address_space::global_space>(parent::val.device[i]);
+    atm.fetch_max(rhsVal);
+    return *this;
+#else
     parent::reduce(rhsVal);
     return *this;
+#endif
   }
 };
 
 //! specialization of ReduceMinLoc for omp_target_reduce
 template <typename T, typename IndexType>
-class ReduceMinLoc<omp_target_reduce, T, IndexType>
-    : public TargetReduceLoc<omp::minloc<T, IndexType>, T, IndexType>
+class ReduceMinLoc<sycl_reduce, T, IndexType>
+    : public TargetReduceLoc<sycl::minloc<T, IndexType>, T, IndexType>
 {
 public:
 
-  using self = ReduceMinLoc<omp_target_reduce, T, IndexType>;
+  using self = ReduceMinLoc<sycl_reduce, T, IndexType>;
   using parent =
-      TargetReduceLoc<omp::minloc<T, IndexType>, T, IndexType>;
+      TargetReduceLoc<sycl::minloc<T, IndexType>, T, IndexType>;
   using parent::parent;
 
   //! enable minloc() for ReduceMinLoc -- alias for reduce()
@@ -446,14 +492,14 @@ public:
 
 //! specialization of ReduceMaxLoc for omp_target_reduce
 template <typename T, typename IndexType>
-class ReduceMaxLoc<omp_target_reduce, T, IndexType>
-    : public TargetReduceLoc<omp::maxloc<T, IndexType>, T, IndexType>
+class ReduceMaxLoc<sycl_reduce, T, IndexType>
+    : public TargetReduceLoc<sycl::maxloc<T, IndexType>, T, IndexType>
 {
 public:
 
-  using self = ReduceMaxLoc<omp_target_reduce, T, IndexType>;
+  using self = ReduceMaxLoc<sycl_reduce, T, IndexType>;
   using parent =
-      TargetReduceLoc<omp::maxloc<T, IndexType>, T, IndexType>;
+      TargetReduceLoc<sycl::maxloc<T, IndexType>, T, IndexType>;
   using parent::parent;
 
   //! enable maxloc() for ReduceMaxLoc -- alias for reduce()

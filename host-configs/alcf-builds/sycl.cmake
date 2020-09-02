@@ -16,8 +16,8 @@ set(RAJA_COMPILER "RAJA_COMPILER_CLANG" CACHE STRING "")
 
 set(CMAKE_CXX_COMPILER "clang++" CACHE PATH "")
 
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -fsycl -fsycl-unnamed-lambda" CACHE STRING "")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO " -O3 -g -fsycl-targets=spir64_gen-unknown-unknown-sycldevice -Xsycl-target-backend '-device skl' -fvisibility-inlines-hidden -finline-functions -finline-hint-functions -fsycl -fsycl-unnamed-lambda" CACHE STRING "")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -fsycl -fsycl-unnamed-lambda " CACHE STRING "")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO " -O3 -g  -fsycl -fsycl-unnamed-lambda " CACHE STRING "")
 set(CMAKE_CXX_FLAGS_DEBUG " -O0 -g -fsycl -fsycl-unnamed-lambda" CACHE STRING "")
 set(CMAKE_CXX_LINK_FLAGS "-fsycl"  CACHE STRING "")
 

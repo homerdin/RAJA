@@ -100,8 +100,8 @@ class TypedListSegment
 #elif defined(RAJA_ENABLE_HIP)
     hipErrchk(hipHostFree(m_data));
 #elif defined(RAJA_ENABLE_SYCL)
-    cl::sycl::queue q = sycl::detail::getQueue();
-    cl::sycl::free(m_data, q);
+    cl::sycl::queue* q = sycl::detail::getQueue();
+    cl::sycl::free(m_data, *q);
 #endif
   }
 
@@ -117,8 +117,8 @@ class TypedListSegment
                             m_size * sizeof(value_type),
                             hipHostMallocMapped));
 #elif defined(RAJA_ENABLE_SYCL)
-    cl::sycl::queue q = sycl::detail::getQueue();
-    m_data = (value_type *) cl::sycl::malloc_shared(m_size * sizeof(value_type), q);
+    cl::sycl::queue* q = sycl::detail::getQueue();
+    m_data = (value_type *) cl::sycl::malloc_shared(m_size * sizeof(value_type), *q);
 #endif
   }
 
@@ -150,8 +150,8 @@ class TypedListSegment
   template <typename Container>
   void copy(Container&& src, BlockCopy)
   {
-    cl::sycl::queue q = sycl::detail::getQueue();
-    q.memcpy(m_data, &(*src.begin()), m_size * sizeof(T));
+    cl::sycl::queue* q = sycl::detail::getQueue();
+    q->memcpy(m_data, &(*src.begin()), m_size * sizeof(T));
   }
 #endif
 

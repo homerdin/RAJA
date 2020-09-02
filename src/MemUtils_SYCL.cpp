@@ -58,12 +58,12 @@ void setQueue(cl::sycl::queue* qu) {
 std::unordered_map<cl::sycl::queue, bool> g_stream_info_map{
     {cl::sycl::queue(), true}};
 
-cl::sycl::queue getQueue() {
+cl::sycl::queue* getQueue() {
   if (app_q != NULL)
-    return *app_q;
+    return app_q;
 
   std::cout << "NOT USING Application QUEUE" << std::endl;
-  return g_status.stream;
+  return &g_status.stream;
 }
 
 }  // namespace detail

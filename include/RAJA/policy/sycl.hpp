@@ -25,6 +25,7 @@
 #include "RAJA/policy/sycl/forall.hpp"
 #include "RAJA/policy/sycl/policy.hpp"
 #include "RAJA/policy/sycl/kernel.hpp"
+#include "RAJA/policy/sycl/reduce.hpp"
 
 #endif
 

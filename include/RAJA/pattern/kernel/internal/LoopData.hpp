@@ -126,9 +126,6 @@ struct LoopData {
     //assign_begin_all();
   }
 
-  LoopData(LoopData const&) = default;
-  ~LoopData() = default;
-
   template <typename SegmentTuple0,
             typename ParamTuple0,
             typename... Bodies0>

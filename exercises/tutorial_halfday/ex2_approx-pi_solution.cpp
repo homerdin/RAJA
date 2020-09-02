@@ -38,6 +38,11 @@
 const int CUDA_BLOCK_SIZE = 256;
 #endif
 
+#if defined(RAJA_ENABLE_SYCL)
+#include <CL/sycl.hpp>
+const int SYCL_BLOCK_SIZE = 256;
+#endif
+
 int main(int RAJA_UNUSED_ARG(argc), char** RAJA_UNUSED_ARG(argv[]))
 {
 
@@ -162,6 +167,32 @@ int main(int RAJA_UNUSED_ARG(argc), char** RAJA_UNUSED_ARG(argv[]))
 
   std::cout << "\tpi = " << std::setprecision(prec)
             << cuda_pi_val << std::endl;
+
+#endif
+
+//----------------------------------------------------------------------------//
+// RAJA SYCL variant.
+//----------------------------------------------------------------------------//
+
+#if defined(RAJA_ENABLE_SYCL)
+  cl::sycl::queue qu;
+  ::RAJA::sycl::detail::setQueue(&qu);
+
+  std::cout << "\n Running RAJA SYCL pi approximation...\n";
+
+  using EXEC_POL3   = RAJA::sycl_exec<SYCL_BLOCK_SIZE>;
+  using REDUCE_POL3 = RAJA::sycl_reduce;
+
+  RAJA::ReduceSum< REDUCE_POL3, double > sycl_pi(0.0);
+
+  RAJA::forall< EXEC_POL3 >(RAJA::RangeSegment(0, N), [=] RAJA_DEVICE (int i) {
+      double x = (double(i) + 0.5) * dx;
+      sycl_pi += dx / (1.0 + x * x);
+  });
+  double sycl_pi_val = sycl_pi.get() * 4.0;
+
+  std::cout << "\tpi = " << std::setprecision(prec)
+            << sycl_pi_val << std::endl;
 
 #endif
 
