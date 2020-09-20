@@ -26,6 +26,7 @@
 #if defined(RAJA_ENABLE_SYCL)
 
 #include "CL/sycl.hpp"
+#include <type_traits>
 
 #include "RAJA/util/types.hpp"
 
@@ -81,6 +82,7 @@ template <typename Iterable, typename LoopBody, size_t BlockSize, bool Async>
 RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
                              Iterable&& iter,
                              LoopBody&& loop_body)
+//RAJA_INLINE void launchSyclNonTrivial(size_t BlockSize, bool Async, Iterable&& iter, LoopBody&& loop_body)
 {
 
   using Iterator  = camp::decay<decltype(std::begin(iter))>;
@@ -104,32 +106,55 @@ RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
     sycl_dim_t gridSize = impl::getGridDim(static_cast<size_t>(len), BlockSize);
 
     cl::sycl::queue* q = ::RAJA::sycl::detail::getQueue();
+    LOOP_BODY* lbody;
+    Iterator* beg;
+//    constexpr bool trivial = std::is_trivially_copyable<LOOP_BODY>::value && std::is_trivially_copyable<Iterator>::value;
+  //  std::cout << "Trivial? " << trivial << std::endl;
+    //if constexpr (true) {
+      lbody = (LOOP_BODY*) cl::sycl::malloc_device(sizeof(LOOP_BODY), *q);
+      auto e = q->memcpy(lbody, &loop_body, sizeof(LOOP_BODY));
+      e.wait();
 
-    LOOP_BODY* lbody = (LOOP_BODY*) cl::sycl::malloc_device(sizeof(LOOP_BODY), *q);
-    auto e = q->memcpy(lbody, &loop_body, sizeof(LOOP_BODY));
-    e.wait();
+      beg = (Iterator*) cl::sycl::malloc_device(sizeof(Iterator), *q);
+      auto e2 = q->memcpy(beg, &begin, sizeof(Iterator));
+      e2.wait();
 
-    Iterator* beg = (Iterator*) cl::sycl::malloc_device(sizeof(Iterator), *q);
-    auto e2 = q->memcpy(beg, &begin, sizeof(Iterator));
-    e2.wait();
+      q->submit([&](cl::sycl::handler& h) {
 
-    q->submit([&](cl::sycl::handler& h) {
+        h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},
+                        [=]  (cl::sycl::nd_item<1> it) {
 
-      h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},
-                      [=]  (cl::sycl::nd_item<1> it) {
+          size_t ii = it.get_global_id(0);
 
-        size_t ii = it.get_global_id(0);
-
-        if (ii < len) {
-          (*lbody)((*beg)[ii]);
-        }
+          if (ii < len) {
+            (*lbody)((*beg)[ii]);
+          }
+        });
       });
-    });
+//    } else {
+/*
+      std::cout << "I'm in the else?\n";
+      q->submit([&](cl::sycl::handler& h) {
 
-    if (true/*!Async*/) { q->wait(); }
+        h.parallel_for( cl::sycl::nd_range<1>{gridSize, blockSize},
+                        [=]  (cl::sycl::nd_item<1> it) {
 
-    cl::sycl::free(lbody, *q);
-    cl::sycl::free(beg, *q);
+          size_t ii = it.get_global_id(0);
+
+          if (ii < len) {
+            loop_body(begin[ii]);
+          }
+        });
+      });*/
+//    }
+
+    //if (!Async) {
+     q->wait(); //}
+
+//    if (!trivial) {
+      cl::sycl::free(lbody, *q);
+      cl::sycl::free(beg, *q);
+  //  }
   }
 }
 
@@ -137,6 +162,7 @@ template <typename Iterable, typename LoopBody, size_t BlockSize, bool Async>
 RAJA_INLINE void forall_impl(sycl_exec_trivial<BlockSize, Async>,
                              Iterable&& iter,
                              LoopBody&& loop_body)
+//RAJA_INLINE void launchSyclTrivial(size_t BlockSize, bool Async, Iterable&& iter, LoopBody&& loop_body)
 {
 
   using Iterator  = camp::decay<decltype(std::begin(iter))>;
@@ -218,7 +244,27 @@ RAJA_INLINE void forall_impl(ExecPolicy<seq_segit, sycl_exec<BlockSize, Async>>,
     q->wait();
   };
 }
+/*
+template <typename Iterable, typename LoopBody, size_t BlockSize, bool Async>
+RAJA_INLINE void forall_impl(sycl_exec<BlockSize, Async>,
+                             Iterable&& iter,
+                             LoopBody&& loop_body)
+{
 
+  using Iterator  = camp::decay<decltype(std::begin(iter))>;
+  using LOOP_BODY = camp::decay<LoopBody>;
+  using IndexType = camp::decay<decltype(std::distance(std::begin(iter), std::end(iter)))>;
+
+  constexpr bool trivial = std::is_trivially_copyable<LOOP_BODY>::value && std::is_trivially_copyable<Iterator>::value;
+
+  if constexpr (trivial) { 
+    launchSyclTrivial(BlockSize, Async, iter, loop_body);
+  } else  {
+    launchSyclNonTrivial(BlockSize, Async, iter, loop_body);
+  }
+
+}
+*/
 }  // namespace sycl
 }  // namespace policy
 
