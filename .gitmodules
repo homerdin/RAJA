@@ -7,7 +7,4 @@
 [submodule "tpl/rocPRIM"]
 	path = tpl/rocPRIM
 	url = https://github.com/ROCmSoftwarePlatform/rocPRIM.git
-[submodule "tpl/camp"]
-	path = tpl/camp
-	url = https://github.com/homerdin/camp.git
-	branch = sycl
+
