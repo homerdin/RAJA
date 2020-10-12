@@ -396,7 +396,7 @@ public:
   self &min(T rhsVal)
   {
 #ifdef __SYCL_DEVICE_ONLY__
-    auto i = 0;//__spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
+    auto i = __spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
     auto atm = cl::sycl::intel::atomic_ref<T, cl::sycl::intel::memory_order::relaxed, cl::sycl::intel::memory_scope::device, cl::sycl::access::address_space::global_space>(parent::val.device[i]);
     atm.fetch_min(rhsVal);
     return *this;
@@ -410,7 +410,7 @@ public:
   const self &min(T rhsVal) const
   {
 #ifdef __SYCL_DEVICE_ONLY__
-    auto i = 0;//__spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
+    auto i = __spirv::initLocalInvocationId<1, cl::sycl::id<1>>()[0];
     auto atm = cl::sycl::intel::atomic_ref<T, cl::sycl::intel::memory_order::relaxed, cl::sycl::intel::memory_scope::device, cl::sycl::access::address_space::global_space>(parent::val.device[i]);
     atm.fetch_min(rhsVal);
     return *this;
